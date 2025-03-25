@@ -24,8 +24,8 @@ const App = () => {
 
     if (type === "json") {
       const json = JSON.parse(originalContent);
-      parsedData = Object.keys(json).map((key) => ({
-        key,
+      parsedData = Object.keys(json).map((key, index) => ({
+        key: index + 1,
         original: json[key],
         translation: targetTranslations ? targetTranslations[key] || "" : "",
       }));
