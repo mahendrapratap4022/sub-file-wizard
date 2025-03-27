@@ -4,6 +4,7 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
   const [translations, setTranslations] = useState(data);
   const [filteredTranslations, setFilteredTranslations] = useState(data);
   const [modifiedFields, setModifiedFields] = useState({});
+  const [filterKey, setFilterKey] = useState("");
   const [filterOriginal, setFilterOriginal] = useState("");
   const [filterTranslation, setFilterTranslation] = useState("");
   const textareasRef = useRef([]);
@@ -33,17 +34,17 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
   }, []);
 
   useEffect(() => {
-    // Filter the table when input fields change
     setFilteredTranslations(
       translations.filter(
         (item) =>
+          item.key.toLowerCase().includes(filterKey.toLowerCase()) &&
           item.original.toLowerCase().includes(filterOriginal.toLowerCase()) &&
           item.translation
             .toLowerCase()
             .includes(filterTranslation.toLowerCase())
       )
     );
-  }, [filterOriginal, filterTranslation, translations]);
+  }, [filterKey, filterOriginal, filterTranslation, translations]);
 
   const handleSave = () => {
     onSave(translations, originalXLF);
@@ -51,54 +52,6 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
 
   return (
     <div className="mt-6 overflow-x-auto">
-      {/* Filter Inputs */}
-      <div className="flex space-x-4 mb-4">
-        {/* Original Text Filter */}
-        <div className="relative w-1/2">
-          <svg
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input
-            type="text"
-            placeholder="Filter by Original Text..."
-            value={filterOriginal}
-            onChange={(e) => setFilterOriginal(e.target.value)}
-            className="border p-2 pl-10 rounded w-full shadow-sm focus:ring focus:ring-blue-300"
-          />
-        </div>
-
-        {/* Translation Filter */}
-        <div className="relative w-1/2">
-          <svg
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input
-            type="text"
-            placeholder="Filter by Translation..."
-            value={filterTranslation}
-            onChange={(e) => setFilterTranslation(e.target.value)}
-            className="border p-2 pl-10 rounded w-full shadow-sm focus:ring focus:ring-blue-300"
-          />
-        </div>
-      </div>
-
-      {/* Table */}
       <table className="min-w-full table-fixed border-collapse">
         <thead>
           <tr className="bg-gray-200">
@@ -108,7 +61,39 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
               Translation
             </th>
           </tr>
+
+          {/* Filter Row */}
+          <tr className="bg-gray-100">
+            <td className="border px-4 py-2">
+              <input
+                type="text"
+                placeholder="🔍 Search Key..."
+                value={filterKey}
+                onChange={(e) => setFilterKey(e.target.value)}
+                className="w-full p-2 border rounded"
+              />
+            </td>
+            <td className="border px-4 py-2">
+              <input
+                type="text"
+                placeholder="🔍 Search Original..."
+                value={filterOriginal}
+                onChange={(e) => setFilterOriginal(e.target.value)}
+                className="w-full p-2 border rounded"
+              />
+            </td>
+            <td className="border px-4 py-2">
+              <input
+                type="text"
+                placeholder="🔍 Search Translation..."
+                value={filterTranslation}
+                onChange={(e) => setFilterTranslation(e.target.value)}
+                className="w-full p-2 border rounded"
+              />
+            </td>
+          </tr>
         </thead>
+
         <tbody>
           {filteredTranslations.map((item, index) => (
             <tr key={index} className="hover:bg-gray-100 bg-white">
@@ -149,7 +134,7 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
 
       {/* Save Button */}
       <div
-        className={`fixed left-0 bottom-0 w-full bg-white shadow-md px-10 py-2 flex gap-4 z-40 transition-all duration-300`}
+        className={`fixed left-0 bottom-0 w-full bg-white shadow-md px-10 py-2 flex gap-4 z-40`}
       >
         <button
           onClick={handleSave}

@@ -5,6 +5,7 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
   const [targetFile, setTargetFile] = useState(null);
   const [originalFileName, setOriginalFileName] = useState("");
   const [targetFileName, setTargetFileName] = useState("");
+  const [fileInputKey, setFileInputKey] = useState(Date.now()); // Unique key for re-render
 
   const handleFileChange = (e, type) => {
     setTranslations([]);
@@ -58,7 +59,6 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
     reader1.readAsText(originalFile);
   };
 
-  // Extract translations from the target file
   const extractTranslations = (originalContent, targetContent, type) => {
     let translations = {};
 
@@ -79,7 +79,6 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
       let currentKey = "";
       let currentText = [];
 
-      // Extract translations from target VTT
       for (let i = 0; i < targetLines.length; i++) {
         const line = targetLines[i];
         if (line.includes("-->")) {
@@ -96,7 +95,6 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
         targetMap[currentKey] = currentText.join(" ");
       }
 
-      // Map timestamps to translations
       for (let i = 0; i < originalLines.length; i++) {
         const line = originalLines[i];
         if (line.includes("-->")) {
@@ -108,15 +106,24 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
     return translations;
   };
 
+  const handleReset = () => {
+    setOriginalFile(null);
+    setTargetFile(null);
+    setOriginalFileName("");
+    setTargetFileName("");
+    setTranslations([]);
+    setFileInputKey(Date.now()); // Force file input to re-render
+  };
+
   return (
     <div className="flex items-center gap-4">
-      {/* Original File Upload */}
       <div className="w-1/3">
         <label className="text-xs block font-semibold mb-1">
           Upload Original File:
         </label>
         <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-400 dark:border-gray-600 rounded-lg p-3 cursor-pointer bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
           <input
+            key={fileInputKey}
             type="file"
             accept={"." + fileType}
             onChange={(e) => handleFileChange(e, "original")}
@@ -130,7 +137,6 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
         </label>
       </div>
 
-      {/* Target File Upload (Only for JSON & VTT) */}
       {fileType !== "xlf" && (
         <div className="w-1/3">
           <label className="text-xs block font-semibold mb-1">
@@ -138,6 +144,7 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
           </label>
           <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-400 dark:border-gray-600 rounded-lg p-3 cursor-pointer bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
             <input
+              key={fileInputKey + 1}
               type="file"
               accept={"." + fileType}
               onChange={(e) => handleFileChange(e, "target")}
@@ -152,14 +159,19 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
         </div>
       )}
 
-      {/* Show Load button only when required files are selected */}
-      {originalFile && (fileType === "xlf" || targetFile) && (
-        <div className="w-1/4">
+      {originalFile && (
+        <div className="w-1/4 flex gap-2">
           <button
             onClick={handleFileLoad}
             className="mt-3 bg-gradient-to-r from-blue-500 to-fuchsia-500 text-white p-3 rounded-lg w-full shadow-md transition-all duration-200 transform"
           >
             Load Content
+          </button>
+          <button
+            onClick={handleReset}
+            className="mt-3 bg-white border border-gray-400 text-gray-700 p-3 rounded-lg w-full shadow-md transition-all duration-200 transform hover:bg-gray-100"
+          >
+            Reset
           </button>
         </div>
       )}
