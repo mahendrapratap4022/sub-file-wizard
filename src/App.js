@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import xml2js from "xml2js";
 import "./App.css";
 import FileUpload from "./components/FileUpload";
@@ -10,6 +10,23 @@ const App = () => {
   const [targetFileName, setTargetFileName] = useState("translated.json");
   const [originalXLFData, setOriginalXLFData] = useState(null);
   const [fileInputKey, setFileInputKey] = useState(Date.now());
+  const [showHeader, setShowHeader] = useState(true);
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+
+    const handleScroll = () => {
+      if (window.scrollY > lastScrollY) {
+        setShowHeader(false); // Hide when scrolling down
+      } else {
+        setShowHeader(true); // Show when scrolling up
+      }
+      lastScrollY = window.scrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const handleFileLoad = (
     originalContent,
@@ -20,12 +37,12 @@ const App = () => {
     setTranslations([]);
     let parsedData = [];
 
-    if (fileName) setTargetFileName(fileName); // Store the correct file name
+    if (fileName) setTargetFileName(fileName);
 
     if (type === "json") {
       const json = JSON.parse(originalContent);
-      parsedData = Object.keys(json).map((key, index) => ({
-        key: index + 1,
+      parsedData = Object.keys(json).map((key) => ({
+        key: key,
         original: json[key],
         translation: targetTranslations ? targetTranslations[key] || "" : "",
       }));
@@ -35,22 +52,15 @@ const App = () => {
       parser.parseString(originalContent, (err, result) => {
         const transUnits = result.xliff.file[0].body[0]["group"];
         setOriginalXLFData(result);
+
         const extractText = (data) => {
-          if (typeof data === "string") {
-            return data; // Direct string
-          }
-          if (Array.isArray(data)) {
-            return data.map(extractText).join(" "); // Recursively join array elements
-          }
+          if (typeof data === "string") return data;
+          if (Array.isArray(data)) return data.map(extractText).join(" ");
           if (typeof data === "object" && data !== null) {
-            if ("_" in data) {
-              return data._; // Extract text from `_`
-            }
-            if ("g" in data) {
-              return data.g.map(extractText).join(" "); // Handle nested `g`
-            }
+            if ("_" in data) return data._;
+            if ("g" in data) return data.g.map(extractText).join(" ");
           }
-          return ""; // Default case
+          return "";
         };
 
         parsedData = transUnits.flatMap((unit) =>
@@ -64,8 +74,6 @@ const App = () => {
         setTranslations(parsedData);
       });
     } else if (type === "vtt") {
-      console.log(targetTranslations, "targetTranslations");
-
       const lines = originalContent.split("\n");
       parsedData = [];
       let currentKey = "";
@@ -74,43 +82,33 @@ const App = () => {
       for (let line of lines) {
         if (line.includes("-->")) {
           if (currentKey) {
-            const translationText =
-              targetTranslations && targetTranslations[currentKey]
-                ? targetTranslations[currentKey]
-                : "";
-
             parsedData.push({
               key: currentKey,
               original: currentOriginal.join(" "),
-              translation: translationText,
+              translation: targetTranslations?.[currentKey] || "",
             });
           }
-          currentKey = line.trim(); // Store timestamp as key
+          currentKey = line.trim();
           currentOriginal = [];
         } else if (line.trim()) {
-          currentOriginal.push(line.trim()); // Store text
+          currentOriginal.push(line.trim());
         }
       }
 
-      // Add the last block
       if (currentKey) {
         parsedData.push({
           key: currentKey,
           original: currentOriginal.join(" "),
-          translation:
-            targetTranslations && targetTranslations[currentKey]
-              ? targetTranslations[currentKey]
-              : "",
+          translation: targetTranslations?.[currentKey] || "",
         });
       }
 
-      console.log("Parsed VTT data:", parsedData);
       setTranslations(parsedData);
     }
   };
 
   const onSave = (updatedTranslations, originalXLFData) => {
-    if (!targetFileName) return; // Ensure we have a filename
+    if (!targetFileName) return;
 
     if (fileType === "json") {
       const jsonOutput = updatedTranslations.reduce((acc, item) => {
@@ -122,23 +120,18 @@ const App = () => {
       const blob = new Blob([jsonString], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-
-      // Preserve original file name
       a.download = targetFileName.endsWith(".json")
         ? targetFileName
         : `${targetFileName}.json`;
-
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
     }
 
     if (fileType === "xlf" && originalXLFData) {
-      // Parse the original XLF data
       const builder = new xml2js.Builder();
       const updatedXLF = JSON.parse(JSON.stringify(originalXLFData));
 
-      // Find and update translation units
       const transUnits = updatedXLF.xliff.file[0].body[0]["group"];
       if (transUnits) {
         transUnits.forEach((unit) => {
@@ -148,38 +141,30 @@ const App = () => {
             );
             if (updatedItem) {
               if (item.target) {
-                item.target[0] = updatedItem.translation; // Update existing target
+                item.target[0] = updatedItem.translation;
               } else {
-                item.target = [updatedItem.translation]; // Create target if missing
+                item.target = [updatedItem.translation];
               }
             }
           });
         });
       }
 
-      // Convert updated JSON to XML
       const xlfString = builder.buildObject(updatedXLF);
-
-      // Preserve original file name and extension
       const fileName = targetFileName.endsWith(".xlf")
         ? targetFileName
         : `${targetFileName}.xlf`;
-
-      // Create Blob and trigger download
       const blob = new Blob([xlfString], { type: "application/xml" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = fileName;
-
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-
-      console.log("XLF file saved as:", fileName);
     }
+
     if (fileType === "vtt") {
       let vttContent = "WEBVTT\n\n";
-
       updatedTranslations.forEach(({ key, translation }) => {
         vttContent += `${key}\n${translation}\n\n`;
       });
@@ -190,34 +175,43 @@ const App = () => {
       a.download = targetFileName.endsWith(".vtt")
         ? targetFileName
         : `${targetFileName}.vtt`;
-
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-
-      console.log("VTT file saved as:", targetFileName);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center">
-      <header className="w-full bg-blue-600 text-white py-4 text-center text-2xl font-semibold shadow-md">
+    <div className="min-h-screen bg-gradient-to-r from-sky-50 to-fuchsia-50 flex flex-col items-center">
+      {/* Floating Header */}
+      <header
+        className={`fixed top-0 left-0 right-0 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white py-2 text-center text-1xl font-semibold shadow-md z-50
+        transition-transform duration-300 ${
+          showHeader ? "translate-y-0" : "-translate-y-full"
+        }`}
+      >
         Translation Editor
       </header>
 
-      <div className="mt-6 w-full max-w-3xl flex items-center space-x-4">
-        <div className="w-1/3">
-          <label className="block mb-1 text-lg font-medium">
+      {/* Fixed Upload Section */}
+      <div
+        className={`fixed left-0 right-0 bg-white shadow-md px-10 py-2 flex gap-4 z-40 transition-all duration-300 ${
+          showHeader ? "top-10" : "top-0"
+        }`}
+      >
+        <div className="w-1/4">
+          <label className="text-xs block font-semibold mb-1">
             Select File Type:
           </label>
           <select
             value={fileType}
             onChange={(e) => {
               setFileType(e.target.value);
-              setTranslations([]); // Clear table on file type change
+              setTranslations([]);
               setFileInputKey(Date.now());
             }}
-            className="border p-2 rounded w-full shadow-sm bg-white"
+            className="border p-2 rounded w-full shadow-sm bg-white text-gray-700 cursor-pointer 
+               focus:ring-2 focus:ring-indigo-400 focus:outline-none transition-all duration-200"
           >
             <option value="json">JSON</option>
             <option value="xlf">XLF</option>
@@ -225,27 +219,28 @@ const App = () => {
           </select>
         </div>
 
-        <div className="w-2/3">
+        <div className="w-3/4">
           <FileUpload
             key={fileInputKey}
             setTranslations={setTranslations}
-            onFileLoad={(original, target, type, fileName) =>
-              handleFileLoad(original, target, type, fileName)
-            }
+            onFileLoad={handleFileLoad}
             fileType={fileType}
           />
         </div>
       </div>
 
-      {translations.length > 0 && (
-        <div className="mt-8 w-full px-10">
-          <TranslationTable
-            data={translations}
-            onSave={onSave}
-            originalXLF={originalXLFData}
-          />
-        </div>
-      )}
+      {/* Content Section */}
+      <div className="pt-24 w-full px-10">
+        {translations.length > 0 && (
+          <div className="pt-10">
+            <TranslationTable
+              data={translations}
+              onSave={onSave}
+              originalXLF={originalXLFData}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

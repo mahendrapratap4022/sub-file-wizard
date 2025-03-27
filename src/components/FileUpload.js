@@ -3,17 +3,24 @@ import React, { useState } from "react";
 const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
   const [originalFile, setOriginalFile] = useState(null);
   const [targetFile, setTargetFile] = useState(null);
+  const [originalFileName, setOriginalFileName] = useState("");
+  const [targetFileName, setTargetFileName] = useState("");
 
   const handleFileChange = (e, type) => {
     setTranslations([]);
     const uploadedFile = e.target.files[0];
-    if (type === "original") {
-      setOriginalFile(uploadedFile);
-      if (fileType === "xlf") {
+    if (uploadedFile) {
+      if (type === "original") {
+        setOriginalFile(uploadedFile);
+        setOriginalFileName(uploadedFile.name);
+        if (fileType === "xlf") {
+          setTargetFile(uploadedFile);
+          setTargetFileName(uploadedFile.name);
+        }
+      } else {
         setTargetFile(uploadedFile);
+        setTargetFileName(uploadedFile.name);
       }
-    } else {
-      setTargetFile(uploadedFile);
     }
   };
 
@@ -102,46 +109,59 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
   };
 
   return (
-    <div className="space-y-4">
-      {/* File Upload Inputs in Same Line */}
-      <div className="flex items-center space-x-4">
-        {/* Original File Upload */}
-        <div className="w-1/2">
-          <label className="block font-semibold mb-1">
-            Upload Original File:
-          </label>
+    <div className="flex items-center gap-4">
+      {/* Original File Upload */}
+      <div className="w-1/3">
+        <label className="text-xs block font-semibold mb-1">
+          Upload Original File:
+        </label>
+        <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-400 dark:border-gray-600 rounded-lg p-3 cursor-pointer bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
           <input
             type="file"
-            accept={fileType === "xlf" ? ".xlf" : ".json,.vtt"}
+            accept={"." + fileType}
             onChange={(e) => handleFileChange(e, "original")}
-            className="border p-2 rounded w-full"
+            className="hidden"
           />
-        </div>
+          <span className="text-xs text-gray-500 dark:text-gray-300">
+            {originalFileName
+              ? `📄 ${originalFileName}`
+              : "📂 Upload Original File"}
+          </span>
+        </label>
+      </div>
 
-        {/* Target File Upload (Only for JSON & VTT) */}
-        {fileType !== "xlf" && (
-          <div className="w-1/2">
-            <label className="block font-semibold mb-1">
-              Upload Target File:
-            </label>
+      {/* Target File Upload (Only for JSON & VTT) */}
+      {fileType !== "xlf" && (
+        <div className="w-1/3">
+          <label className="text-xs block font-semibold mb-1">
+            Upload Target File:
+          </label>
+          <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-400 dark:border-gray-600 rounded-lg p-3 cursor-pointer bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
             <input
               type="file"
-              accept=".json,.vtt"
+              accept={"." + fileType}
               onChange={(e) => handleFileChange(e, "target")}
-              className="border p-2 rounded w-full"
+              className="hidden"
             />
-          </div>
-        )}
-      </div>
+            <span className="text-xs text-gray-500 dark:text-gray-300">
+              {targetFileName
+                ? `📄 ${targetFileName}`
+                : "📂 Upload Target File"}
+            </span>
+          </label>
+        </div>
+      )}
 
       {/* Show Load button only when required files are selected */}
       {originalFile && (fileType === "xlf" || targetFile) && (
-        <button
-          onClick={handleFileLoad}
-          className="bg-blue-500 text-white p-2 rounded w-full"
-        >
-          Load File
-        </button>
+        <div className="w-1/4">
+          <button
+            onClick={handleFileLoad}
+            className="mt-3 bg-gradient-to-r from-blue-500 to-fuchsia-500 text-white p-3 rounded-lg w-full shadow-md transition-all duration-200 transform"
+          >
+            Load Content
+          </button>
+        </div>
       )}
     </div>
   );
