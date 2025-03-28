@@ -233,7 +233,7 @@ const App = () => {
       {/* Content Section */}
       <div className="pt-24 w-full px-10">
         {translations.length > 0 && (
-          <div className="pt-10">
+          <div className="pt-5 pb-20">
             <TranslationTable
               data={translations}
               onSave={onSave}

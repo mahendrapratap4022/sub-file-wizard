@@ -8,6 +8,7 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
   const [filterOriginal, setFilterOriginal] = useState("");
   const [filterTranslation, setFilterTranslation] = useState("");
   const textareasRef = useRef([]);
+  const [loading, setLoading] = useState(true);
 
   const handleChange = (index, e) => {
     const { value } = e.target;
@@ -34,21 +35,43 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
   }, []);
 
   useEffect(() => {
-    setFilteredTranslations(
-      translations.filter(
-        (item) =>
-          item.key.toLowerCase().includes(filterKey.toLowerCase()) &&
-          item.original.toLowerCase().includes(filterOriginal.toLowerCase()) &&
-          item.translation
-            .toLowerCase()
-            .includes(filterTranslation.toLowerCase())
-      )
-    );
+    setLoading(true); // Start loading
+
+    // Simulating a delay for data processing (remove in real implementation)
+    setTimeout(() => {
+      setFilteredTranslations(
+        translations.filter(
+          (item) =>
+            (item.key ?? "")
+              .toString()
+              .toLowerCase()
+              .includes(filterKey.toLowerCase()) &&
+            (item.original ?? "")
+              .toString()
+              .toLowerCase()
+              .includes(filterOriginal.toLowerCase()) &&
+            (item.translation ?? "")
+              .toString()
+              .toLowerCase()
+              .includes(filterTranslation.toLowerCase())
+        )
+      );
+      setLoading(false); // Data is ready
+    }, 500); // Adjust the delay as needed
   }, [filterKey, filterOriginal, filterTranslation, translations]);
 
   const handleSave = () => {
     onSave(translations, originalXLF);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500"></div>
+        <p className="ml-4 text-lg font-semibold">Loading translations...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-6 overflow-x-auto">
