@@ -58,7 +58,7 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
       );
       setLoading(false); // Data is ready
     }, 500); // Adjust the delay as needed
-  }, [filterKey, filterOriginal, filterTranslation, translations]);
+  }, [filterKey, filterOriginal, filterTranslation]);
 
   const handleSave = () => {
     onSave(translations, originalXLF);
@@ -120,10 +120,26 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
         <tbody>
           {filteredTranslations.map((item, index) => (
             <tr key={index} className="hover:bg-gray-100 bg-white">
-              <td className="border px-4 py-2 w-[300px] max-w-[300px] truncate">
-                {item.key}
+              <td className="border px-4 py-2 w-[300px] max-w-[300px] truncate relative group">
+                {/* Wrapping span to ensure overflow detection */}
+                <span className="block w-full truncate" title={item.key}>
+                  {item.key}
+                </span>
+
+                {/* Tooltip - Appears only on hover */}
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 hidden group-hover:flex items-center bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-md whitespace-nowrap z-50">
+                  {item.key}
+                </div>
               </td>
-              <td className="border px-4 py-2">{item.original}</td>
+
+              <td className="border px-4 py-2">
+                {typeof item.original === "string"
+                  ? item.original
+                  : React.isValidElement(item.original)
+                  ? item.original
+                  : JSON.stringify(item.original)}
+              </td>
+
               <td className="border px-4 py-2 w-[700px]">
                 {item.original.length < 50 ? (
                   <input

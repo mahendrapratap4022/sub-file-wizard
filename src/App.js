@@ -7,7 +7,8 @@ import TranslationTable from "./components/TranslationTable";
 const App = () => {
   const [fileType, setFileType] = useState("json");
   const [translations, setTranslations] = useState([]);
-  const [targetFileName, setTargetFileName] = useState("translated.json");
+  const [targetFileName, setTargetFileName] = useState(null);
+  const [originalFileName, setOriginalFileName] = useState(null);
   const [originalXLFData, setOriginalXLFData] = useState(null);
   const [fileInputKey, setFileInputKey] = useState(Date.now());
   const [showHeader, setShowHeader] = useState(true);
@@ -17,9 +18,9 @@ const App = () => {
 
     const handleScroll = () => {
       if (window.scrollY > lastScrollY) {
-        setShowHeader(false); // Hide when scrolling down
+        setShowHeader(false);
       } else {
-        setShowHeader(true); // Show when scrolling up
+        setShowHeader(true);
       }
       lastScrollY = window.scrollY;
     };
@@ -28,16 +29,43 @@ const App = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const extractTextWithTags = (node) => {
+    if (typeof node === "string") return node;
+    if (Array.isArray(node)) return node.map(extractTextWithTags).join(" ");
+
+    if (typeof node === "object" && node !== null) {
+      let result = "";
+
+      if ("_" in node) result += node._; // Add text content if available
+
+      if ("x" in node) {
+        result += node.x.map((x) => ` <x id="${x.$.id}"/>`).join("");
+      }
+
+      if ("g" in node) {
+        result += node.g
+          .map((g) => `<g id="${g.$.id}">${extractTextWithTags(g)}</g>`)
+          .join(" ");
+      }
+
+      return result;
+    }
+
+    return "";
+  };
+
   const handleFileLoad = (
     originalContent,
     targetTranslations,
     type,
-    fileName
+    originalFileName,
+    targetFileName
   ) => {
     setTranslations([]);
     let parsedData = [];
 
-    if (fileName) setTargetFileName(fileName);
+    if (originalFileName) setOriginalFileName(originalFileName);
+    if (targetFileName) setTargetFileName(targetFileName);
 
     if (type === "json") {
       const json = JSON.parse(originalContent);
@@ -50,24 +78,16 @@ const App = () => {
     } else if (type === "xlf") {
       const parser = new xml2js.Parser();
       parser.parseString(originalContent, (err, result) => {
-        const transUnits = result.xliff.file[0].body[0]["group"];
-        setOriginalXLFData(result);
+        if (err) return;
 
-        const extractText = (data) => {
-          if (typeof data === "string") return data;
-          if (Array.isArray(data)) return data.map(extractText).join(" ");
-          if (typeof data === "object" && data !== null) {
-            if ("_" in data) return data._;
-            if ("g" in data) return data.g.map(extractText).join(" ");
-          }
-          return "";
-        };
+        const transUnits = result?.xliff?.file?.[0]?.body?.[0]?.group || [];
+        setOriginalXLFData(result);
 
         parsedData = transUnits.flatMap((unit) =>
           unit["trans-unit"].map((item) => ({
             key: item.$.id,
-            original: extractText(item.source),
-            translation: extractText(item.target),
+            original: extractTextWithTags(item.source[0]),
+            translation: item.target ? extractTextWithTags(item.target[0]) : "",
           }))
         );
 
@@ -108,7 +128,11 @@ const App = () => {
   };
 
   const onSave = (updatedTranslations, originalXLFData) => {
-    if (!targetFileName) return;
+    const timestamp = new Date().toISOString().replace(/[:.-]/g, "");
+    const newFileName = `${originalFileName.replace(
+      /\.[^/.]+$/,
+      ""
+    )}-${timestamp}-translated`;
 
     if (fileType === "json") {
       const jsonOutput = updatedTranslations.reduce((acc, item) => {
@@ -120,9 +144,9 @@ const App = () => {
       const blob = new Blob([jsonString], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = targetFileName.endsWith(".json")
+      a.download = targetFileName?.endsWith(".json")
         ? targetFileName
-        : `${targetFileName}.json`;
+        : `${newFileName}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -151,7 +175,7 @@ const App = () => {
       }
 
       const xlfString = builder.buildObject(updatedXLF);
-      const fileName = targetFileName.endsWith(".xlf")
+      const fileName = targetFileName?.endsWith(".xlf")
         ? targetFileName
         : `${targetFileName}.xlf`;
       const blob = new Blob([xlfString], { type: "application/xml" });
@@ -172,9 +196,9 @@ const App = () => {
       const blob = new Blob([vttContent], { type: "text/vtt" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = targetFileName.endsWith(".vtt")
+      a.download = targetFileName?.endsWith(".vtt")
         ? targetFileName
-        : `${targetFileName}.vtt`;
+        : `${newFileName}.vtt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -183,17 +207,13 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-sky-50 to-fuchsia-50 flex flex-col items-center">
-      {/* Floating Header */}
       <header
-        className={`fixed top-0 left-0 right-0 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white py-2 text-center text-1xl font-semibold shadow-md z-50
-        transition-transform duration-300 ${
+        className={`fixed top-0 left-0 right-0 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white py-2 text-center text-1xl font-semibold shadow-md z-50 transition-transform duration-300 ${
           showHeader ? "translate-y-0" : "-translate-y-full"
         }`}
       >
         Translation Editor
       </header>
-
-      {/* Fixed Upload Section */}
       <div
         className={`fixed left-0 right-0 bg-white shadow-md px-10 py-2 flex gap-4 z-40 transition-all duration-300 ${
           showHeader ? "top-10" : "top-0"
@@ -209,28 +229,31 @@ const App = () => {
               setFileType(e.target.value);
               setTranslations([]);
               setFileInputKey(Date.now());
-              setTargetFileName(`translated.${e.target.value}`);
+              setTargetFileName();
+              setOriginalFileName();
             }}
-            className="border p-2 rounded w-full shadow-sm bg-white text-gray-700 cursor-pointer 
-               focus:ring-2 focus:ring-indigo-400 focus:outline-none transition-all duration-200"
+            className="border p-2 rounded w-full shadow-sm bg-white text-gray-700 cursor-pointer focus:ring-2 focus:ring-indigo-400 focus:outline-none transition-all duration-200"
           >
             <option value="json">JSON</option>
             <option value="xlf">XLF</option>
             <option value="vtt">VTT</option>
           </select>
         </div>
-
         <div className="w-3/4">
           <FileUpload
             key={fileInputKey}
             setTranslations={setTranslations}
             onFileLoad={handleFileLoad}
             fileType={fileType}
+            reset={() => {
+              setTranslations([]);
+              setFileInputKey(Date.now());
+              setTargetFileName();
+              setOriginalFileName();
+            }}
           />
         </div>
       </div>
-
-      {/* Content Section */}
       <div className="pt-24 w-full px-10">
         {translations.length > 0 && (
           <div className="pt-5 pb-20">

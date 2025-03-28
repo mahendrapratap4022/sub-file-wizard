@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
+const FileUpload = ({ onFileLoad, fileType, setTranslations, reset }) => {
   const [originalFile, setOriginalFile] = useState(null);
   const [targetFile, setTargetFile] = useState(null);
   const [originalFileName, setOriginalFileName] = useState("");
@@ -33,9 +33,7 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
       const originalContent = reader1.result;
       let targetContent = null;
 
-      if (fileType === "xlf") {
-        onFileLoad(originalContent, null, fileType, targetFile?.name);
-      } else if (targetFile) {
+      if (targetFile) {
         const reader2 = new FileReader();
         reader2.onload = () => {
           targetContent = reader2.result;
@@ -48,12 +46,19 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
             originalContent,
             extractedTranslations,
             fileType,
-            targetFile.name
+            originalFileName,
+            targetFile?.name
           );
         };
         reader2.readAsText(targetFile);
       } else {
-        onFileLoad(originalContent, null, fileType, targetFile?.name);
+        onFileLoad(
+          originalContent,
+          null,
+          fileType,
+          originalFileName,
+          targetFile?.name
+        );
       }
     };
     reader1.readAsText(originalFile);
@@ -113,6 +118,7 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations }) => {
     setTargetFileName("");
     setTranslations([]);
     setFileInputKey(Date.now()); // Force file input to re-render
+    reset();
   };
 
   return (
