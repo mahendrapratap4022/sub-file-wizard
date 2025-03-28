@@ -209,6 +209,7 @@ const App = () => {
               setFileType(e.target.value);
               setTranslations([]);
               setFileInputKey(Date.now());
+              setTargetFileName(`translated.${e.target.value}`);
             }}
             className="border p-2 rounded w-full shadow-sm bg-white text-gray-700 cursor-pointer 
                focus:ring-2 focus:ring-indigo-400 focus:outline-none transition-all duration-200"
