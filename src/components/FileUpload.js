@@ -1,6 +1,13 @@
 import React, { useState } from "react";
 
-const FileUpload = ({ onFileLoad, fileType, setTranslations, reset }) => {
+const FileUpload = ({
+  onFileLoad,
+  fileType,
+  setTranslations,
+  reset,
+  setSourcelFileName,
+  disabled,
+}) => {
   const [originalFile, setOriginalFile] = useState(null);
   const [targetFile, setTargetFile] = useState(null);
   const [originalFileName, setOriginalFileName] = useState("");
@@ -14,6 +21,7 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations, reset }) => {
       if (type === "original") {
         setOriginalFile(uploadedFile);
         setOriginalFileName(uploadedFile.name);
+        setSourcelFileName(uploadedFile.name);
         if (fileType === "xlf") {
           setTargetFile(uploadedFile);
           setTargetFileName(uploadedFile.name);
@@ -131,6 +139,7 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations, reset }) => {
           <input
             key={fileInputKey}
             type="file"
+            disabled={disabled}
             accept={"." + fileType}
             onChange={(e) => handleFileChange(e, "original")}
             className="hidden"
@@ -153,6 +162,7 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations, reset }) => {
               key={fileInputKey + 1}
               type="file"
               accept={"." + fileType}
+              disabled={disabled}
               onChange={(e) => handleFileChange(e, "target")}
               className="hidden"
             />
@@ -168,6 +178,7 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations, reset }) => {
       {originalFile && (
         <div className="w-1/4 flex gap-2">
           <button
+            disabled={disabled}
             onClick={handleFileLoad}
             className="mt-3 bg-gradient-to-r from-blue-500 to-fuchsia-500 text-white p-3 rounded-lg w-full shadow-md transition-all duration-200 transform"
           >
@@ -175,6 +186,7 @@ const FileUpload = ({ onFileLoad, fileType, setTranslations, reset }) => {
           </button>
           <button
             onClick={handleReset}
+            disabled={disabled}
             className="mt-3 bg-white border border-gray-400 text-gray-700 p-3 rounded-lg w-full shadow-md transition-all duration-200 transform hover:bg-gray-100"
           >
             Reset

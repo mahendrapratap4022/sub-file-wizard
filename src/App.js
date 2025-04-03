@@ -12,22 +12,23 @@ const App = () => {
   const [originalXLFData, setOriginalXLFData] = useState(null);
   const [fileInputKey, setFileInputKey] = useState(Date.now());
   const [showHeader, setShowHeader] = useState(true);
+  const [loading, setLoading] = useState(false); // Loading state
 
-  useEffect(() => {
-    let lastScrollY = window.scrollY;
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [aiForm, setAiForm] = useState({
+    aiModule: "GPT",
+    apiKey: "",
+    apiOrgId: "",
+    systemPrompt: "",
+    targetLanguage: "",
+  });
 
-    const handleScroll = () => {
-      if (window.scrollY > lastScrollY) {
-        setShowHeader(false);
-      } else {
-        setShowHeader(true);
-      }
-      lastScrollY = window.scrollY;
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  const reset = () => {
+    setTranslations([]);
+    setFileInputKey(Date.now());
+    setTargetFileName();
+    setOriginalFileName();
+  };
 
   const extractTextWithTags = (node) => {
     if (typeof node === "string") return node;
@@ -205,6 +206,97 @@ const App = () => {
     }
   };
 
+  const translateWithAI = async () => {
+    if (!aiForm.apiKey || !aiForm.targetLanguage) {
+      alert("Please enter API Key and Target Language.");
+      return;
+    }
+    setLoading(true);
+    const model = aiForm.aiModule === "GPT" ? "gpt-4-turbo" : "claude-3";
+    const apiUrl =
+      aiForm.aiModule === "GPT"
+        ? "https://api.openai.com/v1/chat/completions"
+        : "https://api.anthropic.com/v1/messages";
+
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${aiForm.apiKey}`,
+    };
+
+    if (aiForm.apiOrgId) {
+      headers["OpenAI-Organization"] = aiForm.apiOrgId;
+    }
+
+    // Collect all source texts into a single request
+    const sourceTexts = translations.map((entry) => entry.original).join("\n");
+
+    const systemPrompt =
+      aiForm.systemPrompt ||
+      `Translate the following text to ${aiForm.targetLanguage}, preserving formatting and tags:\n`;
+
+    const requestBody =
+      aiForm.aiModule === "GPT"
+        ? {
+            model: model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: sourceTexts },
+            ],
+            temperature: 0.3,
+          }
+        : {
+            model: model,
+            system: systemPrompt,
+            messages: [{ role: "user", content: sourceTexts }],
+          };
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(requestBody),
+      });
+
+      const responseData = await response.json();
+      const translatedText =
+        aiForm.aiModule === "GPT"
+          ? responseData.choices?.[0]?.message?.content || ""
+          : responseData.content?.[0]?.text || "";
+
+      // Split translated text back into individual lines
+      const translatedLines = translatedText.split("\n");
+
+      const updatedTranslations = translations.map((entry, index) => ({
+        ...entry,
+        translation: translatedLines[index] || "(Error in translation)",
+      }));
+      console.log(updatedTranslations, "updatedTranslations");
+
+      setTranslations(updatedTranslations);
+    } catch (error) {
+      console.error("Error translating:", error);
+      alert("Translation failed. Please check your API key and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+
+    const handleScroll = () => {
+      if (window.scrollY > lastScrollY) {
+        setShowHeader(false);
+      } else {
+        setShowHeader(true);
+      }
+      lastScrollY = window.scrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-r from-sky-50 to-fuchsia-50 flex flex-col items-center">
       <header
@@ -215,11 +307,11 @@ const App = () => {
         Translation Editor
       </header>
       <div
-        className={`fixed left-0 right-0 bg-white shadow-md px-10 py-2 flex gap-4 z-40 transition-all duration-300 ${
+        className={`fixed left-0 right-0 bg-white shadow-md px-10 py-2 flex items-center gap-4 z-40 transition-all duration-300 ${
           showHeader ? "top-10" : "top-0"
         }`}
       >
-        <div className="w-1/4">
+        <div className="w-1/5	">
           <label className="text-xs block font-semibold mb-1">
             Select File Type:
           </label>
@@ -227,10 +319,7 @@ const App = () => {
             value={fileType}
             onChange={(e) => {
               setFileType(e.target.value);
-              setTranslations([]);
-              setFileInputKey(Date.now());
-              setTargetFileName();
-              setOriginalFileName();
+              reset();
             }}
             className="border p-2 rounded w-full shadow-sm bg-white text-gray-700 cursor-pointer focus:ring-2 focus:ring-indigo-400 focus:outline-none transition-all duration-200"
           >
@@ -244,27 +333,118 @@ const App = () => {
             key={fileInputKey}
             setTranslations={setTranslations}
             onFileLoad={handleFileLoad}
+            setSourcelFileName={setOriginalFileName}
             fileType={fileType}
-            reset={() => {
-              setTranslations([]);
-              setFileInputKey(Date.now());
-              setTargetFileName();
-              setOriginalFileName();
-            }}
+            reset={reset}
+            disabled={loading}
           />
         </div>
-      </div>
-      <div className="pt-24 w-full px-10">
-        {translations.length > 0 && (
-          <div className="pt-5 pb-20">
-            <TranslationTable
-              data={translations}
-              onSave={onSave}
-              originalXLF={originalXLFData}
-            />
+
+        {originalFileName && !targetFileName && (
+          <div className="flex justify-end w-[160px]">
+            <button
+              onClick={() => setShowAIModal(true)}
+              disabled={loading}
+              className="mt-3 bg-gradient-to-r from-blue-500 to-fuchsia-500 text-white p-3 rounded-lg w-full shadow-md transition-all duration-200 transform"
+            >
+              {loading ? "Translating..." : "⚡ AI Translation"}
+            </button>
           </div>
         )}
       </div>
+
+      <TranslationTable
+        data={translations}
+        onSave={onSave}
+        originalXLF={originalXLFData}
+      />
+      {showAIModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+            <h2 className="text-lg font-semibold mb-4">AI Translation</h2>
+
+            {/* LLM Model Dropdown */}
+            <label className="block text-sm font-medium mb-2">LLM Model</label>
+            <select
+              value={aiForm.aiModule}
+              onChange={(e) =>
+                setAiForm({ ...aiForm, aiModule: e.target.value })
+              }
+              className="border p-2 rounded w-full mb-4"
+            >
+              <option value="GPT">GPT</option>
+              <option value="Anthropic">Anthropic</option>
+            </select>
+
+            {/* API Key */}
+            <label className="block text-sm font-medium mb-2">API Key</label>
+            <input
+              type="text"
+              value={aiForm.apiKey}
+              onChange={(e) => setAiForm({ ...aiForm, apiKey: e.target.value })}
+              className="border p-2 rounded w-full mb-4"
+            />
+
+            {/* API Organization ID */}
+            <label className="block text-sm font-medium mb-2">
+              API Organization ID
+            </label>
+            <input
+              type="text"
+              value={aiForm.apiOrgId}
+              onChange={(e) =>
+                setAiForm({ ...aiForm, apiOrgId: e.target.value })
+              }
+              className="border p-2 rounded w-full mb-4"
+            />
+
+            {/* System Prompt */}
+            <label className="block text-sm font-medium mb-2">
+              System Prompt (Optional)
+            </label>
+            <textarea
+              value={aiForm.systemPrompt}
+              onChange={(e) =>
+                setAiForm({ ...aiForm, systemPrompt: e.target.value })
+              }
+              className="border p-2 rounded w-full mb-4"
+              rows="3"
+            ></textarea>
+
+            {/* Target Language */}
+            <label className="block text-sm font-medium mb-2">
+              Target Language
+            </label>
+            <input
+              type="text"
+              value={aiForm.targetLanguage}
+              onChange={(e) =>
+                setAiForm({ ...aiForm, targetLanguage: e.target.value })
+              }
+              className="border p-2 rounded w-full mb-4"
+            />
+
+            {/* Buttons */}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowAIModal(false)}
+                className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  translateWithAI();
+                  setShowAIModal(false);
+                }}
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
+              >
+                Start
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

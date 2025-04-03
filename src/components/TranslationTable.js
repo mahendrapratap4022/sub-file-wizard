@@ -25,6 +25,10 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
     e.target.style.height = `${e.target.scrollHeight}px`;
   };
 
+  const handleSave = () => {
+    onSave(translations, originalXLF);
+  };
+
   useEffect(() => {
     textareasRef.current.forEach((textarea) => {
       if (textarea) {
@@ -35,9 +39,7 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
   }, []);
 
   useEffect(() => {
-    setLoading(true); // Start loading
-
-    // Simulating a delay for data processing (remove in real implementation)
+    setLoading(true);
     setTimeout(() => {
       setFilteredTranslations(
         translations.filter(
@@ -60,9 +62,11 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
     }, 500); // Adjust the delay as needed
   }, [filterKey, filterOriginal, filterTranslation]);
 
-  const handleSave = () => {
-    onSave(translations, originalXLF);
-  };
+  useEffect(() => {
+    setTranslations(data);
+    setFilteredTranslations(data);
+    setModifiedFields({});
+  }, [data]);
 
   if (loading) {
     return (
@@ -72,115 +76,122 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
       </div>
     );
   }
+  // console.log(data, filteredTranslations, "filteredTranslations");
+
+  if (data.length === 0) return null;
 
   return (
-    <div className="mt-6 overflow-x-auto">
-      <table className="min-w-full table-fixed border-collapse">
-        <thead>
-          <tr className="bg-gray-200">
-            <th className="px-4 py-2 border text-left w-[300px]">Key</th>
-            <th className="px-4 py-2 border text-left">Original Text</th>
-            <th className="px-4 py-2 border text-left w-[700px]">
-              Translation
-            </th>
-          </tr>
+    <div className="pt-24 w-full px-10">
+      <div className="pt-5 pb-20">
+        <div className="mt-6 overflow-x-auto">
+          <table className="min-w-full table-fixed border-collapse">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="px-4 py-2 border text-left w-[300px]">Key</th>
+                <th className="px-4 py-2 border text-left">Original Text</th>
+                <th className="px-4 py-2 border text-left w-[700px]">
+                  Translation
+                </th>
+              </tr>
 
-          {/* Filter Row */}
-          <tr className="bg-gray-100">
-            <td className="border px-4 py-2">
-              <input
-                type="text"
-                placeholder="🔍 Search Key..."
-                value={filterKey}
-                onChange={(e) => setFilterKey(e.target.value)}
-                className="w-full p-2 border rounded"
-              />
-            </td>
-            <td className="border px-4 py-2">
-              <input
-                type="text"
-                placeholder="🔍 Search Original..."
-                value={filterOriginal}
-                onChange={(e) => setFilterOriginal(e.target.value)}
-                className="w-full p-2 border rounded"
-              />
-            </td>
-            <td className="border px-4 py-2">
-              <input
-                type="text"
-                placeholder="🔍 Search Translation..."
-                value={filterTranslation}
-                onChange={(e) => setFilterTranslation(e.target.value)}
-                className="w-full p-2 border rounded"
-              />
-            </td>
-          </tr>
-        </thead>
-
-        <tbody>
-          {filteredTranslations.map((item, index) => (
-            <tr key={index} className="hover:bg-gray-100 bg-white">
-              <td className="border px-4 py-2 w-[300px] max-w-[300px] truncate relative group">
-                {/* Wrapping span to ensure overflow detection */}
-                <span className="block w-full truncate" title={item.key}>
-                  {item.key}
-                </span>
-
-                {/* Tooltip - Appears only on hover */}
-                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 hidden group-hover:flex items-center bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-md whitespace-nowrap z-50">
-                  {item.key}
-                </div>
-              </td>
-
-              <td className="border px-4 py-2">
-                {typeof item.original === "string"
-                  ? item.original
-                  : React.isValidElement(item.original)
-                  ? item.original
-                  : JSON.stringify(item.original)}
-              </td>
-
-              <td className="border px-4 py-2 w-[700px]">
-                {item.original.length < 50 ? (
+              {/* Filter Row */}
+              <tr className="bg-gray-100">
+                <td className="border px-4 py-2">
                   <input
                     type="text"
-                    defaultValue={item.translation}
-                    onChange={(e) => handleChange(index, e)}
-                    className={`w-full p-2 border rounded transition-all duration-200 ${
-                      modifiedFields[index]
-                        ? "bg-blue-50 border-blue-500"
-                        : "border-gray-300"
-                    }`}
+                    placeholder="🔍 Search Key..."
+                    value={filterKey}
+                    onChange={(e) => setFilterKey(e.target.value)}
+                    className="w-full p-2 border rounded"
                   />
-                ) : (
-                  <textarea
-                    ref={(el) => (textareasRef.current[index] = el)}
-                    defaultValue={item.translation}
-                    onChange={(e) => handleChange(index, e)}
-                    className={`w-full p-2 border rounded resize-none min-h-[40px] overflow-hidden transition-all duration-200 ${
-                      modifiedFields[index]
-                        ? "bg-blue-50 border-blue-500"
-                        : "border-gray-300"
-                    }`}
-                    style={{ minHeight: "40px" }}
+                </td>
+                <td className="border px-4 py-2">
+                  <input
+                    type="text"
+                    placeholder="🔍 Search Original..."
+                    value={filterOriginal}
+                    onChange={(e) => setFilterOriginal(e.target.value)}
+                    className="w-full p-2 border rounded"
                   />
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                </td>
+                <td className="border px-4 py-2">
+                  <input
+                    type="text"
+                    placeholder="🔍 Search Translation..."
+                    value={filterTranslation}
+                    onChange={(e) => setFilterTranslation(e.target.value)}
+                    className="w-full p-2 border rounded"
+                  />
+                </td>
+              </tr>
+            </thead>
 
-      {/* Save Button */}
-      <div
-        className={`fixed left-0 bottom-0 w-full bg-white shadow-md px-10 py-2 flex gap-4 z-40`}
-      >
-        <button
-          onClick={handleSave}
-          className="mx-auto block bg-gradient-to-r from-emerald-400 to-emerald-500 text-white py-3 px-6 text-lg font-semibold rounded-lg shadow-md hover:bg-green-600 transition-all"
-        >
-          Save / Export
-        </button>
+            <tbody>
+              {filteredTranslations.map((item, index) => (
+                <tr key={index} className="hover:bg-gray-100 bg-white">
+                  <td className="border px-4 py-2 w-[300px] max-w-[300px] truncate relative group">
+                    {/* Wrapping span to ensure overflow detection */}
+                    <span className="block w-full truncate" title={item.key}>
+                      {item.key}
+                    </span>
+
+                    {/* Tooltip - Appears only on hover */}
+                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 hidden group-hover:flex items-center bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-md whitespace-nowrap z-50">
+                      {item.key}
+                    </div>
+                  </td>
+
+                  <td className="border px-4 py-2">
+                    {typeof item.original === "string"
+                      ? item.original
+                      : React.isValidElement(item.original)
+                      ? item.original
+                      : JSON.stringify(item.original)}
+                  </td>
+
+                  <td className="border px-4 py-2 w-[700px]">
+                    {item.original.length < 50 ? (
+                      <input
+                        type="text"
+                        defaultValue={item.translation}
+                        onChange={(e) => handleChange(index, e)}
+                        className={`w-full p-2 border rounded transition-all duration-200 ${
+                          modifiedFields[index]
+                            ? "bg-blue-50 border-blue-500"
+                            : "border-gray-300"
+                        }`}
+                      />
+                    ) : (
+                      <textarea
+                        ref={(el) => (textareasRef.current[index] = el)}
+                        defaultValue={item.translation}
+                        onChange={(e) => handleChange(index, e)}
+                        className={`w-full p-2 border rounded resize-none min-h-[40px] overflow-hidden transition-all duration-200 ${
+                          modifiedFields[index]
+                            ? "bg-blue-50 border-blue-500"
+                            : "border-gray-300"
+                        }`}
+                        style={{ minHeight: "40px" }}
+                      />
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Save Button */}
+          <div
+            className={`fixed left-0 bottom-0 w-full bg-white shadow-md px-10 py-2 flex gap-4 z-40`}
+          >
+            <button
+              onClick={handleSave}
+              className="mx-auto block bg-gradient-to-r from-emerald-400 to-emerald-500 text-white py-3 px-6 text-lg font-semibold rounded-lg shadow-md hover:bg-green-600 transition-all"
+            >
+              Save / Export
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
