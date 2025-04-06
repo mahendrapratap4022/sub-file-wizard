@@ -3,6 +3,7 @@ import xml2js from "xml2js";
 import "./App.css";
 import FileUpload from "./components/FileUpload";
 import TranslationTable from "./components/TranslationTable";
+import lang from "./data/lang";
 
 const App = () => {
   const [fileType, setFileType] = useState("json");
@@ -12,9 +13,13 @@ const App = () => {
   const [originalXLFData, setOriginalXLFData] = useState(null);
   const [fileInputKey, setFileInputKey] = useState(Date.now());
   const [showHeader, setShowHeader] = useState(true);
-  const [loading, setLoading] = useState(false); // Loading state
-
+  const [loading, setLoading] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
+  const [fileError, setFileError] = useState(null);
+  const [selectedKeys, setSelectedKeys] = useState([]);
+
+  const [targetLanguageName, setTargetLanguageName] = useState("");
+
   const [aiForm, setAiForm] = useState({
     aiModule: "GPT",
     apiKey: "",
@@ -23,11 +28,38 @@ const App = () => {
     targetLanguage: "",
   });
 
+  const triggerFileError = (message) => {
+    setFileError(message);
+    setTimeout(() => {
+      setFileError(null);
+    }, 5000);
+  };
+
+  const handleLanguageChange = (e) => {
+    const selectedName = e.target.value;
+    setTargetLanguageName(selectedName);
+
+    const found = lang.find((l) => l.name === selectedName);
+
+    if (found) {
+      setAiForm((prev) => ({
+        ...prev,
+        targetLanguage: found.code,
+      }));
+    } else {
+      setAiForm((prev) => ({
+        ...prev,
+        targetLanguage: "",
+      }));
+    }
+  };
+
   const reset = () => {
     setTranslations([]);
     setFileInputKey(Date.now());
     setTargetFileName();
     setOriginalFileName();
+    setSelectedKeys([]);
   };
 
   const extractTextWithTags = (node) => {
@@ -62,69 +94,78 @@ const App = () => {
     originalFileName,
     targetFileName
   ) => {
-    setTranslations([]);
-    let parsedData = [];
+    try {
+      setTranslations([]);
+      let parsedData = [];
 
-    if (originalFileName) setOriginalFileName(originalFileName);
-    if (targetFileName) setTargetFileName(targetFileName);
+      if (originalFileName) setOriginalFileName(originalFileName);
+      if (targetFileName) setTargetFileName(targetFileName);
 
-    if (type === "json") {
-      const json = JSON.parse(originalContent);
-      parsedData = Object.keys(json).map((key) => ({
-        key: key,
-        original: json[key],
-        translation: targetTranslations ? targetTranslations[key] || "" : "",
-      }));
-      setTranslations(parsedData);
-    } else if (type === "xlf") {
-      const parser = new xml2js.Parser();
-      parser.parseString(originalContent, (err, result) => {
-        if (err) return;
+      if (type === "json") {
+        const json = JSON.parse(originalContent);
+        parsedData = Object.keys(json).map((key) => ({
+          key: key,
+          original: json[key],
+          translation: targetTranslations ? targetTranslations[key] || "" : "",
+        }));
+        setTranslations(parsedData);
+      } else if (type === "xlf") {
+        const parser = new xml2js.Parser();
+        parser.parseString(originalContent, (err, result) => {
+          if (err || !result?.xliff?.file?.[0]?.body?.[0]?.group) {
+            triggerFileError("Invalid XLF file structure.");
+            return;
+          }
 
-        const transUnits = result?.xliff?.file?.[0]?.body?.[0]?.group || [];
-        setOriginalXLFData(result);
+          const transUnits = result?.xliff?.file?.[0]?.body?.[0]?.group || [];
+          setOriginalXLFData(result);
 
-        parsedData = transUnits.flatMap((unit) =>
-          unit["trans-unit"].map((item) => ({
-            key: item.$.id,
-            original: extractTextWithTags(item.source[0]),
-            translation: item.target ? extractTextWithTags(item.target[0]) : "",
-          }))
-        );
+          parsedData = transUnits.flatMap((unit) =>
+            unit["trans-unit"].map((item) => ({
+              key: item.$.id,
+              original: extractTextWithTags(item.source[0]),
+              translation: item.target
+                ? extractTextWithTags(item.target[0])
+                : "",
+            }))
+          );
+
+          setTranslations(parsedData);
+        });
+      } else if (type === "vtt") {
+        const lines = originalContent.split("\n");
+        parsedData = [];
+        let currentKey = "";
+        let currentOriginal = [];
+
+        for (let line of lines) {
+          if (line.includes("-->")) {
+            if (currentKey) {
+              parsedData.push({
+                key: currentKey,
+                original: currentOriginal.join(" "),
+                translation: targetTranslations?.[currentKey] || "",
+              });
+            }
+            currentKey = line.trim();
+            currentOriginal = [];
+          } else if (line.trim()) {
+            currentOriginal.push(line.trim());
+          }
+        }
+
+        if (currentKey) {
+          parsedData.push({
+            key: currentKey,
+            original: currentOriginal.join(" "),
+            translation: targetTranslations?.[currentKey] || "",
+          });
+        }
 
         setTranslations(parsedData);
-      });
-    } else if (type === "vtt") {
-      const lines = originalContent.split("\n");
-      parsedData = [];
-      let currentKey = "";
-      let currentOriginal = [];
-
-      for (let line of lines) {
-        if (line.includes("-->")) {
-          if (currentKey) {
-            parsedData.push({
-              key: currentKey,
-              original: currentOriginal.join(" "),
-              translation: targetTranslations?.[currentKey] || "",
-            });
-          }
-          currentKey = line.trim();
-          currentOriginal = [];
-        } else if (line.trim()) {
-          currentOriginal.push(line.trim());
-        }
       }
-
-      if (currentKey) {
-        parsedData.push({
-          key: currentKey,
-          original: currentOriginal.join(" "),
-          translation: targetTranslations?.[currentKey] || "",
-        });
-      }
-
-      setTranslations(parsedData);
+    } catch (error) {
+      triggerFileError(error.message || "Failed to process the uploaded file.");
     }
   };
 
@@ -208,7 +249,7 @@ const App = () => {
 
   const translateWithAI = async () => {
     if (!aiForm.apiKey || !aiForm.targetLanguage) {
-      alert("Please enter API Key and Target Language.");
+      triggerFileError("Please enter API Key and Target Language.");
       return;
     }
     setLoading(true);
@@ -226,9 +267,14 @@ const App = () => {
     if (aiForm.apiOrgId) {
       headers["OpenAI-Organization"] = aiForm.apiOrgId;
     }
+    const entriesToTranslate =
+      targetFileName && selectedKeys.length > 0
+        ? translations.filter((_, index) => selectedKeys.includes(index))
+        : translations;
 
-    // Collect all source texts into a single request
-    const sourceTexts = translations.map((entry) => entry.original).join("\n");
+    const sourceTexts = entriesToTranslate
+      .map((entry) => entry.original)
+      .join("\n");
 
     const systemPrompt =
       aiForm.systemPrompt ||
@@ -257,6 +303,17 @@ const App = () => {
         body: JSON.stringify(requestBody),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json(); // Read once!
+        const errorMessage = errorData?.error?.message || "Unknown API error";
+
+        console.error("AI API error:", errorData); // Log full response if needed
+
+        triggerFileError(
+          `API error: ${response.status} ${response.statusText}\n${errorMessage}`
+        );
+        return; // Exit early
+      }
       const responseData = await response.json();
       const translatedText =
         aiForm.aiModule === "GPT"
@@ -266,16 +323,26 @@ const App = () => {
       // Split translated text back into individual lines
       const translatedLines = translatedText.split("\n");
 
-      const updatedTranslations = translations.map((entry, index) => ({
-        ...entry,
-        translation: translatedLines[index] || "(Error in translation)",
-      }));
-      console.log(updatedTranslations, "updatedTranslations");
+      const updatedTranslations = translations.map((entry, index) => {
+        const selectedIndex = entriesToTranslate.findIndex(
+          (e) => e.key === entry.key
+        );
+        if (selectedIndex !== -1) {
+          return {
+            ...entry,
+            translation:
+              translatedLines[selectedIndex] || "(Error in translation)",
+          };
+        }
+        return entry;
+      });
 
       setTranslations(updatedTranslations);
     } catch (error) {
-      console.error("Error translating:", error);
-      alert("Translation failed. Please check your API key and try again.");
+      triggerFileError(
+        error.message ||
+          "Failed to process the uploaded file in AI translatation."
+      );
     } finally {
       setLoading(false);
     }
@@ -340,7 +407,7 @@ const App = () => {
           />
         </div>
 
-        {originalFileName && !targetFileName && (
+        {originalFileName && (
           <div className="flex justify-end w-[160px]">
             <button
               onClick={() => setShowAIModal(true)}
@@ -352,16 +419,22 @@ const App = () => {
           </div>
         )}
       </div>
-
+      {fileError && (
+        <div className="fixed top-[88px] left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded shadow z-50">
+          {fileError}
+        </div>
+      )}
       <TranslationTable
         data={translations}
         onSave={onSave}
         originalXLF={originalXLFData}
+        selectedKeys={selectedKeys}
+        setSelectedKeys={setSelectedKeys}
       />
       {showAIModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
-            <h2 className="text-lg font-semibold mb-4">AI Translation</h2>
+          <div className="bg-white p-6 rounded-lg shadow-lg w-[900px] max-w-full">
+            <h2 className="text-xl font-semibold mb-6">AI Translation</h2>
 
             {/* LLM Model Dropdown */}
             <label className="block text-sm font-medium mb-2">LLM Model</label>
@@ -385,9 +458,9 @@ const App = () => {
               className="border p-2 rounded w-full mb-4"
             />
 
-            {/* API Organization ID */}
+            {/* Org ID */}
             <label className="block text-sm font-medium mb-2">
-              API Organization ID
+              API Organization ID (Optional)
             </label>
             <input
               type="text"
@@ -411,18 +484,23 @@ const App = () => {
               rows="3"
             ></textarea>
 
-            {/* Target Language */}
+            {/* Target Language with dropdown/search */}
             <label className="block text-sm font-medium mb-2">
               Target Language
             </label>
             <input
               type="text"
-              value={aiForm.targetLanguage}
-              onChange={(e) =>
-                setAiForm({ ...aiForm, targetLanguage: e.target.value })
-              }
-              className="border p-2 rounded w-full mb-4"
+              list="languageOptions"
+              value={targetLanguageName}
+              onChange={handleLanguageChange}
+              placeholder="Type or select language"
+              className="border p-2 rounded w-full"
             />
+            <datalist id="languageOptions">
+              {lang.map((lang) => (
+                <option key={lang.code} value={lang.name} />
+              ))}
+            </datalist>
 
             {/* Buttons */}
             <div className="flex justify-end gap-2">
