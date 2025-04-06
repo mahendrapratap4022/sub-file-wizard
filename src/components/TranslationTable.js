@@ -164,14 +164,18 @@ const TranslationTable = ({ data, onSave, originalXLF }) => {
                     ) : (
                       <textarea
                         ref={(el) => (textareasRef.current[index] = el)}
-                        defaultValue={item.translation}
+                        value={item.translation}
                         onChange={(e) => handleChange(index, e)}
-                        className={`w-full p-2 border rounded resize-none min-h-[40px] overflow-hidden transition-all duration-200 ${
+                        className={`w-full p-2 border rounded resize-none overflow-hidden transition-all duration-200 ${
                           modifiedFields[index]
                             ? "bg-blue-50 border-blue-500"
                             : "border-gray-300"
                         }`}
-                        style={{ minHeight: "40px" }}
+                        style={{
+                          minHeight: "40px",
+                          height:
+                            textareasRef.current[index]?.scrollHeight + "px",
+                        }}
                       />
                     )}
                   </td>
