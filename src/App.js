@@ -112,23 +112,48 @@ const App = () => {
       } else if (type === "xlf") {
         const parser = new xml2js.Parser();
         parser.parseString(originalContent, (err, result) => {
-          if (err || !result?.xliff?.file?.[0]?.body?.[0]?.group) {
+          if (err || !result?.xliff?.file) {
             triggerFileError("Invalid XLF file structure.");
             return;
           }
 
-          const transUnits = result?.xliff?.file?.[0]?.body?.[0]?.group || [];
+          const files = result.xliff.file;
+          const transUnits = [];
+
+          for (const file of files) {
+            const body = file.body?.[0];
+
+            if (!body) continue;
+
+            // Handle <trans-unit> directly under <body>
+            if (body["trans-unit"]) {
+              transUnits.push(...body["trans-unit"]);
+            }
+
+            // Handle <group> containing <trans-unit>
+            if (body.group) {
+              for (const group of body.group) {
+                if (group["trans-unit"]) {
+                  transUnits.push(...group["trans-unit"]);
+                }
+              }
+            }
+          }
+
+          if (!transUnits.length) {
+            triggerFileError("No trans-units found in the XLF file.");
+            return;
+          }
+
           setOriginalXLFData(result);
 
-          parsedData = transUnits.flatMap((unit) =>
-            unit["trans-unit"].map((item) => ({
-              key: item.$.id,
-              original: extractTextWithTags(item.source[0]),
-              translation: item.target
-                ? extractTextWithTags(item.target[0])
-                : "",
-            }))
-          );
+          const parsedData = transUnits.map((item) => ({
+            key: item.$.id,
+            original: extractTextWithTags(item.source?.[0]),
+            translation: item.target
+              ? extractTextWithTags(item.target?.[0])
+              : "",
+          }));
 
           setTranslations(parsedData);
         });
