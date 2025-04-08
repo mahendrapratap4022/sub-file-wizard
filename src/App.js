@@ -293,7 +293,7 @@ const App = () => {
       headers["OpenAI-Organization"] = aiForm.apiOrgId;
     }
     const entriesToTranslate =
-      targetFileName && selectedKeys.length > 0
+      selectedKeys.length > 0
         ? translations.filter((_, index) => selectedKeys.includes(index))
         : translations;
 
@@ -436,7 +436,7 @@ const App = () => {
           <div className="flex justify-end w-[160px]">
             <button
               onClick={() => setShowAIModal(true)}
-              disabled={loading}
+              // disabled={loading}
               className="mt-3 bg-gradient-to-r from-blue-500 to-fuchsia-500 text-white p-3 rounded-lg w-full shadow-md transition-all duration-200 transform"
             >
               {loading ? "Translating..." : "⚡ AI Translation"}
@@ -450,11 +450,12 @@ const App = () => {
         </div>
       )}
       <TranslationTable
-        data={translations}
+        translations={translations}
         onSave={onSave}
         originalXLF={originalXLFData}
         selectedKeys={selectedKeys}
         setSelectedKeys={setSelectedKeys}
+        setTranslations={setTranslations}
       />
       {showAIModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-50">

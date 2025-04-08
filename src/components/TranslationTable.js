@@ -1,18 +1,26 @@
 import React, { useState, useEffect, useRef } from "react";
 
 const TranslationTable = ({
-  data,
+  translations,
   onSave,
   originalXLF,
   selectedKeys,
   setSelectedKeys,
+  setTranslations,
 }) => {
-  const [translations, setTranslations] = useState(data);
-  const [filteredTranslations, setFilteredTranslations] = useState(data);
+  const [filteredTranslations, setFilteredTranslations] =
+    useState(translations);
   const [modifiedFields, setModifiedFields] = useState({});
   const [filterKey, setFilterKey] = useState("");
   const [filterOriginal, setFilterOriginal] = useState("");
   const [filterTranslation, setFilterTranslation] = useState("");
+  const [newRow, setNewRow] = useState({
+    key: "",
+    original: "",
+    translation: "",
+  });
+  const [isAddingNewRow, setIsAddingNewRow] = useState(false);
+
   const textareasRef = useRef([]);
   const [loading, setLoading] = useState(true);
 
@@ -81,10 +89,10 @@ const TranslationTable = ({
   }, [filterKey, filterOriginal, filterTranslation]);
 
   useEffect(() => {
-    setTranslations(data);
-    setFilteredTranslations(data);
+    setTranslations(translations);
+    setFilteredTranslations(translations);
     setModifiedFields({});
-  }, [data]);
+  }, [translations]);
 
   if (loading) {
     return (
@@ -95,7 +103,7 @@ const TranslationTable = ({
     );
   }
 
-  if (data.length === 0) return null;
+  if (translations.length === 0) return null;
 
   return (
     <div className="pt-24 w-full px-10">
@@ -161,7 +169,7 @@ const TranslationTable = ({
 
                   <td className="border px-4 py-2 w-[300px] max-w-[300px] truncate relative group">
                     <span className="block w-full truncate" title={item.key}>
-                      {item.key}
+                      {item.key} {index}
                     </span>
                     <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 hidden group-hover:flex items-center bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-md whitespace-nowrap z-50">
                       {item.key}
@@ -209,6 +217,88 @@ const TranslationTable = ({
                 </tr>
               ))}
             </tbody>
+            {isAddingNewRow && (
+              <tr className="bg-yellow-50">
+                <td></td>
+                <td className="border px-4 py-2">
+                  <input
+                    type="text"
+                    placeholder="New Key"
+                    value={newRow.key}
+                    onChange={(e) =>
+                      setNewRow({ ...newRow, key: e.target.value })
+                    }
+                    className="w-full p-2 border rounded"
+                  />
+                </td>
+                <td className="border px-4 py-2">
+                  <input
+                    type="text"
+                    placeholder="Original Text"
+                    value={newRow.original}
+                    onChange={(e) =>
+                      setNewRow({ ...newRow, original: e.target.value })
+                    }
+                    className="w-full p-2 border rounded"
+                  />
+                </td>
+                <td className="border px-4 py-2 flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Translation"
+                    value={newRow.translation}
+                    onChange={(e) =>
+                      setNewRow({ ...newRow, translation: e.target.value })
+                    }
+                    className="w-full p-2 border rounded"
+                  />
+                  <button
+                    onClick={() => {
+                      if (!newRow.key.trim()) return;
+
+                      const updated = [...translations, newRow];
+                      setTranslations(updated);
+
+                      // Reapply filters
+                      const filtered = updated.filter(
+                        (item) =>
+                          (item.key ?? "")
+                            .toString()
+                            .toLowerCase()
+                            .includes(filterKey.toLowerCase()) &&
+                          (item.original ?? "")
+                            .toString()
+                            .toLowerCase()
+                            .includes(filterOriginal.toLowerCase()) &&
+                          (item.translation ?? "")
+                            .toString()
+                            .toLowerCase()
+                            .includes(filterTranslation.toLowerCase())
+                      );
+                      setFilteredTranslations(filtered);
+
+                      setNewRow({ key: "", original: "", translation: "" });
+                      setIsAddingNewRow(false);
+                    }}
+                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                  >
+                    Save
+                  </button>
+                </td>
+              </tr>
+            )}
+            <tr>
+              <td colSpan="4" className="text-center py-4">
+                {!isAddingNewRow && (
+                  <button
+                    onClick={() => setIsAddingNewRow(true)}
+                    className="text-blue-600 font-medium hover:underline"
+                  >
+                    ➕ Add New Row
+                  </button>
+                )}
+              </td>
+            </tr>
           </table>
 
           {/* Save Button */}
