@@ -21,11 +21,11 @@ const App = () => {
   const [targetLanguageName, setTargetLanguageName] = useState("");
 
   const [aiForm, setAiForm] = useState({
-    aiModule: "GPT",
+    aiProvider: "",
+    aiModel: "",
     apiKey: "",
     apiOrgId: "",
     systemPrompt: "",
-    targetLanguage: "",
   });
 
   const triggerFileError = (message) => {
@@ -273,25 +273,32 @@ const App = () => {
   };
 
   const translateWithAI = async () => {
-    if (!aiForm.apiKey || !aiForm.targetLanguage) {
+    if (!aiForm.apiKey || !targetLanguageName) {
       triggerFileError("Please enter API Key and Target Language.");
       return;
     }
+
+    if (!aiForm.aiProvider || !aiForm.aiModel) {
+      triggerFileError("Please select an AI Provider and Model.");
+      return;
+    }
+
     setLoading(true);
-    const model = aiForm.aiModule === "GPT" ? "gpt-4-turbo" : "claude-3";
-    const apiUrl =
-      aiForm.aiModule === "GPT"
-        ? "https://api.openai.com/v1/chat/completions"
-        : "https://api.anthropic.com/v1/messages";
+
+    const isOpenAI = aiForm.aiProvider === "OpenAI";
+    const apiUrl = isOpenAI
+      ? "https://api.openai.com/v1/chat/completions"
+      : "https://api.anthropic.com/v1/messages";
 
     const headers = {
       "Content-Type": "application/json",
       Authorization: `Bearer ${aiForm.apiKey}`,
     };
 
-    if (aiForm.apiOrgId) {
+    if (isOpenAI && aiForm.apiOrgId) {
       headers["OpenAI-Organization"] = aiForm.apiOrgId;
     }
+
     const entriesToTranslate =
       selectedKeys.length > 0
         ? translations.filter((_, index) => selectedKeys.includes(index))
@@ -303,49 +310,48 @@ const App = () => {
 
     const systemPrompt =
       aiForm.systemPrompt ||
-      `Translate the following text to ${aiForm.targetLanguage}, preserving formatting and tags:\n`;
+      `Translate the following text to ${targetLanguageName}, preserving formatting and tags:\n`;
 
-    const requestBody =
-      aiForm.aiModule === "GPT"
-        ? {
-            model: model,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: sourceTexts },
-            ],
-            temperature: 0.3,
-          }
-        : {
-            model: model,
-            system: systemPrompt,
-            messages: [{ role: "user", content: sourceTexts }],
-          };
+    const requestBody = isOpenAI
+      ? {
+          model: aiForm.aiModel,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: sourceTexts },
+          ],
+          temperature: 0.3,
+        }
+      : {
+          model: aiForm.aiModel,
+          system: systemPrompt,
+          messages: [{ role: "user", content: sourceTexts }],
+        };
 
     try {
       const response = await fetch(apiUrl, {
         method: "POST",
-        headers: headers,
+        headers,
         body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        const errorData = await response.json(); // Read once!
+        const errorData = await response.json();
         const errorMessage = errorData?.error?.message || "Unknown API error";
 
-        console.error("AI API error:", errorData); // Log full response if needed
+        console.error("AI API error:", errorData);
 
         triggerFileError(
           `API error: ${response.status} ${response.statusText}\n${errorMessage}`
         );
-        return; // Exit early
+        return;
       }
-      const responseData = await response.json();
-      const translatedText =
-        aiForm.aiModule === "GPT"
-          ? responseData.choices?.[0]?.message?.content || ""
-          : responseData.content?.[0]?.text || "";
 
-      // Split translated text back into individual lines
+      const responseData = await response.json();
+
+      const translatedText = isOpenAI
+        ? responseData.choices?.[0]?.message?.content || ""
+        : responseData.content?.[0]?.text || "";
+
       const translatedLines = translatedText.split("\n");
 
       const updatedTranslations = translations.map((entry, index) => {
@@ -366,7 +372,7 @@ const App = () => {
     } catch (error) {
       triggerFileError(
         error.message ||
-          "Failed to process the uploaded file in AI translatation."
+          "Failed to process the uploaded file in AI translation."
       );
     } finally {
       setLoading(false);
@@ -462,18 +468,63 @@ const App = () => {
           <div className="bg-white p-6 rounded-lg shadow-lg w-[900px] max-w-full">
             <h2 className="text-xl font-semibold mb-6">AI Translation</h2>
 
-            {/* LLM Model Dropdown */}
-            <label className="block text-sm font-medium mb-2">LLM Model</label>
+            {/* AI Provider Dropdown */}
+            <label className="block text-sm font-medium mb-2">
+              AI Provider
+            </label>
             <select
-              value={aiForm.aiModule}
+              value={aiForm.aiProvider}
               onChange={(e) =>
-                setAiForm({ ...aiForm, aiModule: e.target.value })
+                setAiForm({
+                  ...aiForm,
+                  aiProvider: e.target.value,
+                  aiModel: "",
+                })
               }
               className="border p-2 rounded w-full mb-4"
             >
-              <option value="GPT">GPT</option>
+              <option value="">Select Provider</option>
+              <option value="OpenAI">OpenAI</option>
               <option value="Anthropic">Anthropic</option>
             </select>
+
+            {/* AI Model Dropdown */}
+            {aiForm.aiProvider && (
+              <>
+                <label className="block text-sm font-medium mb-2">
+                  AI Model
+                </label>
+                <select
+                  value={aiForm.aiModel}
+                  onChange={(e) =>
+                    setAiForm({ ...aiForm, aiModel: e.target.value })
+                  }
+                  className="border p-2 rounded w-full mb-4"
+                >
+                  <option value="">Select Model</option>
+                  {aiForm.aiProvider === "OpenAI" && (
+                    <>
+                      <option value="gpt-4-turbo">gpt-4-turbo</option>
+                      <option value="gpt-4">gpt-4</option>
+                      <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                    </>
+                  )}
+                  {aiForm.aiProvider === "Anthropic" && (
+                    <>
+                      <option value="claude-3-opus-latest">
+                        claude-3-opus-latest
+                      </option>
+                      <option value="claude-3-sonnet-latest">
+                        claude-3-sonnet-latest
+                      </option>
+                      <option value="claude-3-haiku-latest">
+                        claude-3-haiku-latest
+                      </option>
+                    </>
+                  )}
+                </select>
+              </>
+            )}
 
             {/* API Key */}
             <label className="block text-sm font-medium mb-2">API Key</label>
