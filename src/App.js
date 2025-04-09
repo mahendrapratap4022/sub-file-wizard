@@ -4,6 +4,7 @@ import "./App.css";
 import FileUpload from "./components/FileUpload";
 import TranslationTable from "./components/TranslationTable";
 import lang from "./data/lang";
+import Profiles from "./data/profile";
 
 const App = () => {
   const [fileType, setFileType] = useState("json");
@@ -18,6 +19,7 @@ const App = () => {
   const [fileError, setFileError] = useState(null);
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
+  const [selectedProfileIndex, setSelectedProfileIndex] = useState(null);
 
   const [targetLanguageName, setTargetLanguageName] = useState("");
 
@@ -375,7 +377,6 @@ const App = () => {
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
-
     const handleScroll = () => {
       if (window.scrollY > lastScrollY) {
         setShowHeader(false);
@@ -460,8 +461,50 @@ const App = () => {
       {showAIModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-[900px] max-w-full">
-            <h2 className="text-xl font-semibold mb-6">AI Translation</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold">AI Translation</h2>
+              <select
+                className="border p-2 rounded text-sm"
+                value={selectedProfileIndex ?? ""}
+                onChange={(e) => {
+                  const value = e.target.value;
 
+                  if (value === "") {
+                    // Reset everything if "Select Profile" is chosen
+                    setSelectedProfileIndex(null);
+                    setAiForm({
+                      aiProvider: "",
+                      aiModel: "",
+                      apiKey: "",
+                      apiOrgId: "",
+                      systemPrompt: "",
+                      targetLanguage: "",
+                    });
+                    setTargetLanguageName("");
+                  } else {
+                    const index = Number(value);
+                    const profile = Profiles[index];
+                    setSelectedProfileIndex(index);
+                    setAiForm({
+                      aiProvider: profile?.aiProvider,
+                      aiModel: profile?.aiModel,
+                      apiKey: profile?.apiKey,
+                      apiOrgId: profile?.apiOrgId || "",
+                      systemPrompt: profile?.systemPrompt || "",
+                      targetLanguage: profile?.targetLanguage || "",
+                    });
+                    setTargetLanguageName(profile?.targetLanguage || "");
+                  }
+                }}
+              >
+                <option value="">Select Profile</option>
+                {Profiles.map((profile, index) => (
+                  <option key={index} value={index}>
+                    {profile.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             {/* AI Provider Dropdown */}
             <label className="block text-sm font-medium mb-2">
               AI Provider
