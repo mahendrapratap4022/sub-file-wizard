@@ -17,6 +17,7 @@ const App = () => {
   const [showAIModal, setShowAIModal] = useState(false);
   const [fileError, setFileError] = useState(null);
   const [selectedKeys, setSelectedKeys] = useState([]);
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
 
   const [targetLanguageName, setTargetLanguageName] = useState("");
 
@@ -35,22 +36,11 @@ const App = () => {
     }, 5000);
   };
 
-  const handleLanguageChange = (e) => {
-    const selectedName = e.target.value;
-    setTargetLanguageName(selectedName);
-
-    const found = lang.find((l) => l.name === selectedName);
-
-    if (found) {
-      setAiForm((prev) => ({
-        ...prev,
-        targetLanguage: found.code,
-      }));
-    } else {
-      setAiForm((prev) => ({
-        ...prev,
-        targetLanguage: "",
-      }));
+  const handleLanguageChange = (name) => {
+    const selectedLang = lang.find((l) => l.name === name);
+    setTargetLanguageName(name);
+    if (selectedLang) {
+      setAiForm({ ...aiForm, targetLanguage: selectedLang.code });
     }
   };
 
@@ -379,6 +369,10 @@ const App = () => {
     }
   };
 
+  const filteredLanguages = lang.filter((l) =>
+    l.name.toLowerCase().includes(targetLanguageName.toLowerCase())
+  );
+
   useEffect(() => {
     let lastScrollY = window.scrollY;
 
@@ -548,6 +542,42 @@ const App = () => {
               className="border p-2 rounded w-full mb-4"
             />
 
+            {/* Target Language with search dropdown */}
+            <label className="block text-sm font-medium mb-2">
+              Target Language
+            </label>
+            <div className="relative mb-4">
+              <input
+                type="text"
+                value={targetLanguageName}
+                onChange={(e) => {
+                  setTargetLanguageName(e.target.value);
+                  setShowLangDropdown(true);
+                  handleLanguageChange(e.target.value);
+                }}
+                placeholder="Type or select language"
+                className="border p-2 rounded w-full"
+                onFocus={() => setShowLangDropdown(true)}
+                onBlur={() => setTimeout(() => setShowLangDropdown(false), 150)} // allow click selection
+              />
+              {showLangDropdown && filteredLanguages.length > 0 && (
+                <ul className="absolute z-10 bg-white border border-gray-300 rounded max-h-60 overflow-y-auto mt-1 w-full shadow-lg">
+                  {filteredLanguages.map((l) => (
+                    <li
+                      key={l.code}
+                      className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                      onMouseDown={() => {
+                        handleLanguageChange(l.name);
+                        setShowLangDropdown(false);
+                      }}
+                    >
+                      {l.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             {/* System Prompt */}
             <label className="block text-sm font-medium mb-2">
               System Prompt (Optional)
@@ -561,26 +591,8 @@ const App = () => {
               rows="3"
             ></textarea>
 
-            {/* Target Language with dropdown/search */}
-            <label className="block text-sm font-medium mb-2">
-              Target Language
-            </label>
-            <input
-              type="text"
-              list="languageOptions"
-              value={targetLanguageName}
-              onChange={handleLanguageChange}
-              placeholder="Type or select language"
-              className="border p-2 rounded w-full"
-            />
-            <datalist id="languageOptions">
-              {lang.map((lang) => (
-                <option key={lang.code} value={lang.name} />
-              ))}
-            </datalist>
-
             {/* Buttons */}
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 mt-3">
               <button
                 onClick={() => setShowAIModal(false)}
                 className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500 transition"
