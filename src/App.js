@@ -79,6 +79,31 @@ const App = () => {
     return "";
   };
 
+  const parseTxtTranslations = (content) => {
+    const lines = content.split("\n");
+    const translations = {};
+    let currentKey = "";
+    let currentValue = [];
+
+    for (const line of lines) {
+      if (line.startsWith("#KEY:")) {
+        if (currentKey) {
+          translations[currentKey] = currentValue.join(" ").trim();
+        }
+        currentKey = line.substring(5).trim();
+        currentValue = [];
+      } else {
+        currentValue.push(line.trim());
+      }
+    }
+
+    if (currentKey) {
+      translations[currentKey] = currentValue.join(" ").trim();
+    }
+
+    return translations;
+  };
+
   const handleFileLoad = (
     originalContent,
     targetTranslations,
@@ -180,6 +205,38 @@ const App = () => {
         }
 
         setTranslations(parsedData);
+      } else if (type === "txt") {
+        parsedData = [];
+        const lines = originalContent.split("\n");
+        let currentKey = "";
+        let currentValue = [];
+
+        for (const line of lines) {
+          if (line.startsWith("#KEY:")) {
+            if (currentKey) {
+              parsedData.push({
+                key: currentKey,
+                original: currentValue.join(" ").trim(),
+                translation: targetTranslations?.[currentKey] || "",
+              });
+            }
+            currentKey = line.substring(5).trim();
+            currentValue = [];
+          } else {
+            currentValue.push(line.trim());
+          }
+        }
+
+        // Push the last item
+        if (currentKey) {
+          parsedData.push({
+            key: currentKey,
+            original: currentValue.join(" ").trim(),
+            translation: targetTranslations?.[currentKey] || "",
+          });
+        }
+
+        setTranslations(parsedData);
       }
     } catch (error) {
       triggerFileError(error.message || "Failed to process the uploaded file.");
@@ -258,6 +315,23 @@ const App = () => {
       a.download = targetFileName?.endsWith(".vtt")
         ? targetFileName
         : `${newFileName}.vtt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    if (fileType === "txt") {
+      let txtContent = "";
+      updatedTranslations.forEach(({ key, translation }) => {
+        txtContent += `#KEY: ${key}\n${translation}\n\n`;
+      });
+
+      const blob = new Blob([txtContent], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = targetFileName?.endsWith(".txt")
+        ? targetFileName
+        : `${newFileName}.txt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -419,6 +493,7 @@ const App = () => {
             <option value="json">JSON</option>
             <option value="xlf">XLF</option>
             <option value="vtt">VTT</option>
+            <option value="txt">TXT</option>
           </select>
         </div>
         <div className="w-3/4">

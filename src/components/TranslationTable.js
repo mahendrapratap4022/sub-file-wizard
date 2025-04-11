@@ -169,7 +169,7 @@ const TranslationTable = ({
 
                   <td className="border px-4 py-2 w-[300px] max-w-[300px] truncate relative group">
                     <span className="block w-full truncate" title={item.key}>
-                      {item.key} {index}
+                      {item.key}
                     </span>
                     <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 hidden group-hover:flex items-center bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-md whitespace-nowrap z-50">
                       {item.key}
