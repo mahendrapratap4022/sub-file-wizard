@@ -54,6 +54,7 @@ const App = () => {
     setSelectedKeys([]);
   };
 
+  // this is a util method to remove tags and get only source texts.
   const extractTextWithTags = (node) => {
     if (typeof node === "string") return node;
     if (Array.isArray(node)) return node.map(extractTextWithTags).join(" ");
@@ -79,31 +80,7 @@ const App = () => {
     return "";
   };
 
-  const parseTxtTranslations = (content) => {
-    const lines = content.split("\n");
-    const translations = {};
-    let currentKey = "";
-    let currentValue = [];
-
-    for (const line of lines) {
-      if (line.startsWith("#KEY:")) {
-        if (currentKey) {
-          translations[currentKey] = currentValue.join(" ").trim();
-        }
-        currentKey = line.substring(5).trim();
-        currentValue = [];
-      } else {
-        currentValue.push(line.trim());
-      }
-    }
-
-    if (currentKey) {
-      translations[currentKey] = currentValue.join(" ").trim();
-    }
-
-    return translations;
-  };
-
+  // this method used to handle file load.
   const handleFileLoad = (
     originalContent,
     targetTranslations,
@@ -243,6 +220,7 @@ const App = () => {
     }
   };
 
+  // This method used to export file after making changes
   const onSave = (updatedTranslations, originalXLFData) => {
     const timestamp = new Date().toISOString().replace(/[:.-]/g, "");
     const newFileName = `${originalFileName.replace(
@@ -338,6 +316,7 @@ const App = () => {
     }
   };
 
+  // this is used to translate with AI
   const translateWithAI = async () => {
     if (!aiForm.apiKey || !targetLanguageName) {
       triggerFileError("Please enter API Key and Target Language.");

@@ -114,6 +114,32 @@ const FileUpload = ({
           translations[line] = targetMap[line] || "";
         }
       }
+    } else if (type === "txt") {
+      translations = parseTxtTranslations(targetContent);
+    }
+    return translations;
+  };
+
+  const parseTxtTranslations = (content) => {
+    const lines = content.split("\n");
+    const translations = {};
+    let currentKey = "";
+    let currentValue = [];
+
+    for (const line of lines) {
+      if (line.startsWith("#KEY:")) {
+        if (currentKey) {
+          translations[currentKey] = currentValue.join(" ").trim();
+        }
+        currentKey = line.substring(5).trim();
+        currentValue = [];
+      } else {
+        currentValue.push(line.trim());
+      }
+    }
+
+    if (currentKey) {
+      translations[currentKey] = currentValue.join(" ").trim();
     }
 
     return translations;
