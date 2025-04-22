@@ -1,4 +1,12 @@
 import React, { useState } from "react";
+import * as pdfjsLib from "pdfjs-dist";
+import mammoth from "mammoth";
+
+const readDocxText = async (file) => {
+  const arrayBuffer = await file.arrayBuffer();
+  const { value } = await mammoth.extractRawText({ arrayBuffer });
+  return value;
+};
 
 const FileUpload = ({
   onFileLoad,
@@ -33,9 +41,74 @@ const FileUpload = ({
     }
   };
 
-  const handleFileLoad = () => {
+  const handleFileLoad = async () => {
     if (!originalFile) return;
 
+    if (fileType === "pdf") {
+      const readPdfText = async (file) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+        const textChunks = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          const text = content.items
+            .map((item) => item.str.trim())
+            .filter(Boolean)
+            .join("\n");
+          textChunks.push(text.trim());
+        }
+        return textChunks.join("\n\n");
+      };
+
+      const originalContent = await readPdfText(originalFile);
+      let targetContent = null;
+
+      if (targetFile) {
+        targetContent = await readPdfText(targetFile);
+      }
+
+      // Basic translation mapping: split by line breaks
+      const extractedTranslations = extractTranslations(
+        originalContent,
+        targetContent,
+        fileType
+      );
+
+      onFileLoad(
+        originalContent,
+        extractedTranslations,
+        fileType,
+        originalFileName,
+        targetFile?.name
+      );
+      return;
+    }
+    if (fileType === "docx") {
+      const originalContent = await readDocxText(originalFile);
+      let targetContent = null;
+      if (targetFile) {
+        targetContent = await readDocxText(targetFile);
+      }
+
+      const extractedTranslations = extractTranslations(
+        originalContent,
+        targetContent,
+        fileType
+      );
+
+      onFileLoad(
+        originalContent,
+        extractedTranslations,
+        fileType,
+        originalFile.name,
+        targetFile?.name
+      );
+      return;
+    }
+
+    // Default non-PDF handling
     const reader1 = new FileReader();
     reader1.onload = () => {
       const originalContent = reader1.result;
@@ -114,32 +187,41 @@ const FileUpload = ({
           translations[line] = targetMap[line] || "";
         }
       }
-    } else if (type === "txt") {
-      translations = parseTxtTranslations(targetContent);
-    }
-    return translations;
-  };
+    } else if (type === "txt" || type === "pdf" || type === "docx") {
+      const parseKeyValueContent = (content) => {
+        const lines = content.split(/\n+/);
+        const map = {};
+        let currentKey = "";
+        let currentValue = [];
 
-  const parseTxtTranslations = (content) => {
-    const lines = content.split("\n");
-    const translations = {};
-    let currentKey = "";
-    let currentValue = [];
-
-    for (const line of lines) {
-      if (line.startsWith("#KEY:")) {
-        if (currentKey) {
-          translations[currentKey] = currentValue.join(" ").trim();
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("#KEY:")) {
+            if (currentKey) {
+              map[currentKey] = currentValue.join(" ").trim();
+            }
+            currentKey = trimmed.substring(5).trim();
+            currentValue = [];
+          } else if (trimmed) {
+            currentValue.push(trimmed);
+          }
         }
-        currentKey = line.substring(5).trim();
-        currentValue = [];
-      } else {
-        currentValue.push(line.trim());
-      }
-    }
 
-    if (currentKey) {
-      translations[currentKey] = currentValue.join(" ").trim();
+        if (currentKey) {
+          map[currentKey] = currentValue.join(" ").trim();
+        }
+
+        return map;
+      };
+
+      const originalMap = parseKeyValueContent(originalContent);
+      const targetMap = targetContent
+        ? parseKeyValueContent(targetContent)
+        : {};
+
+      Object.keys(originalMap).forEach((key) => {
+        translations[key] = targetMap[key] || "";
+      });
     }
 
     return translations;

@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from "react";
 import xml2js from "xml2js";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { Document, Packer, Paragraph, TextRun } from "docx";
 import "./App.css";
 import FileUpload from "./components/FileUpload";
 import TranslationTable from "./components/TranslationTable";
 import lang from "./data/lang";
 import Profiles from "./data/profile";
+import * as pdfjsLib from "pdfjs-dist/build/pdf";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.entry";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const App = () => {
   const [fileType, setFileType] = useState("json");
@@ -80,8 +86,43 @@ const App = () => {
     return "";
   };
 
+  const parseKeyValueContent = (content, targetTranslations = {}) => {
+    const lines = content.replace(/\r\n/g, "\n").split("\n");
+    const parsedData = [];
+    let currentKey = "";
+    let currentValue = [];
+
+    for (const line of lines) {
+      if (line.startsWith("#KEY:")) {
+        if (currentKey) {
+          parsedData.push({
+            key: currentKey,
+            original: currentValue.join(" ").trim(),
+            translation: targetTranslations
+              ? targetTranslations[currentKey]
+              : "",
+          });
+        }
+        currentKey = line.substring(5).trim();
+        currentValue = [];
+      } else {
+        currentValue.push(line.trim());
+      }
+    }
+
+    if (currentKey) {
+      parsedData.push({
+        key: currentKey,
+        original: currentValue.join(" ").trim(),
+        translation: targetTranslations ? targetTranslations[currentKey] : "",
+      });
+    }
+
+    return parsedData;
+  };
+
   // this method used to handle file load.
-  const handleFileLoad = (
+  const handleFileLoad = async (
     originalContent,
     targetTranslations,
     type,
@@ -182,46 +223,22 @@ const App = () => {
         }
 
         setTranslations(parsedData);
-      } else if (type === "txt") {
-        parsedData = [];
-        const lines = originalContent.split("\n");
-        let currentKey = "";
-        let currentValue = [];
-
-        for (const line of lines) {
-          if (line.startsWith("#KEY:")) {
-            if (currentKey) {
-              parsedData.push({
-                key: currentKey,
-                original: currentValue.join(" ").trim(),
-                translation: targetTranslations?.[currentKey] || "",
-              });
-            }
-            currentKey = line.substring(5).trim();
-            currentValue = [];
-          } else {
-            currentValue.push(line.trim());
-          }
-        }
-
-        // Push the last item
-        if (currentKey) {
-          parsedData.push({
-            key: currentKey,
-            original: currentValue.join(" ").trim(),
-            translation: targetTranslations?.[currentKey] || "",
-          });
-        }
+      } else if (type === "txt" || type === "pdf" || type === "docx") {
+        const parsedData = parseKeyValueContent(
+          originalContent,
+          targetTranslations
+        );
 
         setTranslations(parsedData);
       }
     } catch (error) {
+      console.error(error);
       triggerFileError(error.message || "Failed to process the uploaded file.");
     }
   };
 
   // This method used to export file after making changes
-  const onSave = (updatedTranslations, originalXLFData) => {
+  const onSave = async (updatedTranslations, originalXLFData) => {
     const timestamp = new Date().toISOString().replace(/[:.-]/g, "");
     const newFileName = `${originalFileName.replace(
       /\.[^/.]+$/,
@@ -310,6 +327,82 @@ const App = () => {
       a.download = targetFileName?.endsWith(".txt")
         ? targetFileName
         : `${newFileName}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    if (fileType === "pdf") {
+      const generatePDF = async () => {
+        const pdfDoc = await PDFDocument.create();
+        const page = pdfDoc.addPage();
+        const { width, height } = page.getSize();
+        const fontSize = 12;
+        const margin = 40;
+        let y = height - margin;
+
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+        updatedTranslations.forEach(({ key, translation }) => {
+          const lines = [`#KEY: ${key}`, translation, ""];
+          lines.forEach((line) => {
+            if (y < margin + fontSize) {
+              y = height - margin;
+              pdfDoc.addPage();
+            }
+            page.drawText(line, {
+              x: margin,
+              y,
+              size: fontSize,
+              font,
+              color: rgb(0, 0, 0),
+            });
+            y -= fontSize + 4;
+          });
+        });
+
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: "application/pdf" });
+        const fileName = targetFileName?.endsWith(".pdf")
+          ? targetFileName
+          : `${newFileName}.pdf`;
+
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+
+      generatePDF();
+    }
+    if (fileType === "docx") {
+      const doc = new Document({
+        sections: [
+          {
+            properties: {},
+            children: updatedTranslations.flatMap(({ key, translation }) => [
+              new Paragraph({
+                children: [new TextRun({ text: `#KEY: ${key}`, bold: true })],
+              }),
+              new Paragraph({
+                children: [new TextRun(translation)],
+              }),
+              new Paragraph({}), // empty line for spacing
+            ]),
+          },
+        ],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const fileName = targetFileName?.endsWith(".docx")
+        ? targetFileName
+        : `${newFileName}.docx`;
+
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -473,6 +566,8 @@ const App = () => {
             <option value="xlf">XLF</option>
             <option value="vtt">VTT</option>
             <option value="txt">TXT</option>
+            <option value="pdf">PDF</option>
+            <option value="docx">DOCX</option>
           </select>
         </div>
         <div className="w-3/4">
