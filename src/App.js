@@ -26,6 +26,7 @@ const App = () => {
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
   const [selectedProfileIndex, setSelectedProfileIndex] = useState(null);
+  const [modifiedFields, setModifiedFields] = useState({});
 
   const [targetLanguageName, setTargetLanguageName] = useState("");
 
@@ -58,6 +59,7 @@ const App = () => {
     setTargetFileName();
     setOriginalFileName();
     setSelectedKeys([]);
+    setModifiedFields({});
   };
 
   // this is a util method to remove tags and get only source texts.
@@ -87,37 +89,12 @@ const App = () => {
   };
 
   const parseKeyValueContent = (content, targetTranslations = {}) => {
-    const lines = content.replace(/\r\n/g, "\n").split("\n");
-    const parsedData = [];
-    let currentKey = "";
-    let currentValue = [];
-
-    for (const line of lines) {
-      if (line.startsWith("#KEY:")) {
-        if (currentKey) {
-          parsedData.push({
-            key: currentKey,
-            original: currentValue.join(" ").trim(),
-            translation: targetTranslations
-              ? targetTranslations[currentKey]
-              : "",
-          });
-        }
-        currentKey = line.substring(5).trim();
-        currentValue = [];
-      } else {
-        currentValue.push(line.trim());
-      }
-    }
-
-    if (currentKey) {
-      parsedData.push({
-        key: currentKey,
-        original: currentValue.join(" ").trim(),
-        translation: targetTranslations ? targetTranslations[currentKey] : "",
-      });
-    }
-
+    const parsedData = [
+      {
+        original: content,
+        translation: targetTranslations,
+      },
+    ];
     return parsedData;
   };
 
@@ -228,7 +205,6 @@ const App = () => {
           originalContent,
           targetTranslations
         );
-
         setTranslations(parsedData);
       }
     } catch (error) {
@@ -318,7 +294,7 @@ const App = () => {
     if (fileType === "txt") {
       let txtContent = "";
       updatedTranslations.forEach(({ key, translation }) => {
-        txtContent += `#KEY: ${key}\n${translation}\n\n`;
+        txtContent += `${translation}\n\n`;
       });
 
       const blob = new Blob([txtContent], { type: "text/plain" });
@@ -336,7 +312,7 @@ const App = () => {
       const generatePDF = async () => {
         const pdfDoc = await PDFDocument.create();
         const page = pdfDoc.addPage();
-        const { width, height } = page.getSize();
+        const { height } = page.getSize();
         const fontSize = 12;
         const margin = 40;
         let y = height - margin;
@@ -344,7 +320,7 @@ const App = () => {
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
         updatedTranslations.forEach(({ key, translation }) => {
-          const lines = [`#KEY: ${key}`, translation, ""];
+          const lines = [translation, ""];
           lines.forEach((line) => {
             if (y < margin + fontSize) {
               y = height - margin;
@@ -384,12 +360,9 @@ const App = () => {
             properties: {},
             children: updatedTranslations.flatMap(({ key, translation }) => [
               new Paragraph({
-                children: [new TextRun({ text: `#KEY: ${key}`, bold: true })],
-              }),
-              new Paragraph({
                 children: [new TextRun(translation)],
               }),
-              new Paragraph({}), // empty line for spacing
+              new Paragraph({}),
             ]),
           },
         ],
@@ -606,6 +579,9 @@ const App = () => {
         selectedKeys={selectedKeys}
         setSelectedKeys={setSelectedKeys}
         setTranslations={setTranslations}
+        fileType={fileType}
+        modifiedFields={modifiedFields}
+        setModifiedFields={setModifiedFields}
       />
       {showAIModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-50">

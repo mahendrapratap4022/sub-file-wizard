@@ -7,10 +7,16 @@ const TranslationTable = ({
   selectedKeys,
   setSelectedKeys,
   setTranslations,
+  fileType,
+  modifiedFields,
+  setModifiedFields,
 }) => {
+  const shouldShowKey = !["pdf", "docx", "txt"].includes(
+    fileType?.toLowerCase()
+  );
+
   const [filteredTranslations, setFilteredTranslations] =
     useState(translations);
-  const [modifiedFields, setModifiedFields] = useState({});
   const [filterKey, setFilterKey] = useState("");
   const [filterOriginal, setFilterOriginal] = useState("");
   const [filterTranslation, setFilterTranslation] = useState("");
@@ -91,7 +97,6 @@ const TranslationTable = ({
   useEffect(() => {
     setTranslations(translations);
     setFilteredTranslations(translations);
-    setModifiedFields({});
   }, [translations]);
 
   if (loading) {
@@ -113,7 +118,9 @@ const TranslationTable = ({
             <thead>
               <tr className="bg-gray-200">
                 <th className="px-4 py-2 border text-left w-[100px]">⚡ AI</th>
-                <th className="px-4 py-2 border text-left w-[300px]">Key</th>
+                {shouldShowKey && (
+                  <th className="px-4 py-2 border text-left w-[300px]">Key</th>
+                )}
                 <th className="px-4 py-2 border text-left w-[600px]">
                   Original Text
                 </th>
@@ -125,15 +132,17 @@ const TranslationTable = ({
               {/* Filter Row */}
               <tr className="bg-gray-100">
                 <td></td>
-                <td className="border px-4 py-2">
-                  <input
-                    type="text"
-                    placeholder="🔍 Search Key..."
-                    value={filterKey}
-                    onChange={(e) => setFilterKey(e.target.value)}
-                    className="w-full p-2 border rounded"
-                  />
-                </td>
+                {shouldShowKey && (
+                  <td className="border px-4 py-2">
+                    <input
+                      type="text"
+                      placeholder="🔍 Search Key..."
+                      value={filterKey}
+                      onChange={(e) => setFilterKey(e.target.value)}
+                      className="w-full p-2 border rounded"
+                    />
+                  </td>
+                )}
                 <td className="border px-4 py-2">
                   <input
                     type="text"
@@ -166,17 +175,17 @@ const TranslationTable = ({
                       className="w-5 h-5 accent-indigo-500 cursor-pointer"
                     />
                   </td>
-
-                  <td className="border px-4 py-2 w-[300px] max-w-[300px] truncate relative group">
-                    <span className="block w-full truncate" title={item.key}>
-                      {item.key}
-                    </span>
-                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 hidden group-hover:flex items-center bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-md whitespace-nowrap z-50">
-                      {item.key}
-                    </div>
-                  </td>
-
-                  <td className="border px-4 py-2">
+                  {shouldShowKey && (
+                    <td className="border px-4 py-2 w-[300px] max-w-[300px] truncate relative group">
+                      <span className="block w-full truncate" title={item.key}>
+                        {item.key}
+                      </span>
+                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 hidden group-hover:flex items-center bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-md whitespace-nowrap z-50">
+                        {item.key}
+                      </div>
+                    </td>
+                  )}
+                  <td className="border px-4 py-2 whitespace-pre-wrap">
                     {typeof item.original === "string"
                       ? item.original
                       : React.isValidElement(item.original)

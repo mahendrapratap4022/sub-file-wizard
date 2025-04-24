@@ -188,40 +188,7 @@ const FileUpload = ({
         }
       }
     } else if (type === "txt" || type === "pdf" || type === "docx") {
-      const parseKeyValueContent = (content) => {
-        const lines = content.split(/\n+/);
-        const map = {};
-        let currentKey = "";
-        let currentValue = [];
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith("#KEY:")) {
-            if (currentKey) {
-              map[currentKey] = currentValue.join(" ").trim();
-            }
-            currentKey = trimmed.substring(5).trim();
-            currentValue = [];
-          } else if (trimmed) {
-            currentValue.push(trimmed);
-          }
-        }
-
-        if (currentKey) {
-          map[currentKey] = currentValue.join(" ").trim();
-        }
-
-        return map;
-      };
-
-      const originalMap = parseKeyValueContent(originalContent);
-      const targetMap = targetContent
-        ? parseKeyValueContent(targetContent)
-        : {};
-
-      Object.keys(originalMap).forEach((key) => {
-        translations[key] = targetMap[key] || "";
-      });
+      return targetContent;
     }
 
     return translations;
