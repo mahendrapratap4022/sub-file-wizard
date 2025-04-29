@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import xml2js from "xml2js";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
+import * as fontkit from "fontkit";
 import { Document, Packer, Paragraph, TextRun } from "docx";
+
+import { getFont } from "./utils/service";
 import "./App.css";
 import FileUpload from "./components/FileUpload";
 import TranslationTable from "./components/TranslationTable";
@@ -311,29 +314,91 @@ const App = () => {
     if (fileType === "pdf") {
       const generatePDF = async () => {
         const pdfDoc = await PDFDocument.create();
+        pdfDoc.registerFontkit(fontkit);
+
+        const fontBytes = await fetch(getFont(aiForm.targetLanguage)).then(
+          (res) => res.arrayBuffer()
+        );
+        const customFont = await pdfDoc.embedFont(fontBytes);
+
         const page = pdfDoc.addPage();
-        const { height } = page.getSize();
+        const { height, width } = page.getSize();
         const fontSize = 12;
         const margin = 40;
+        const lineHeight = fontSize + 4; // Line height with padding between lines
         let y = height - margin;
 
-        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        // Define the maximum width of the text (accounting for margin)
+        const textWidth = width - 2 * margin;
 
         updatedTranslations.forEach(({ key, translation }) => {
           const lines = [translation, ""];
+
           lines.forEach((line) => {
+            const textLength = customFont.widthOfTextAtSize(line, fontSize);
+
+            // If the text overflows the page width, split it into multiple lines
+            if (textLength > textWidth) {
+              const words = line.split(" ");
+              let currentLine = "";
+
+              // Split into multiple lines based on word wrapping
+              words.forEach((word) => {
+                const testLine = currentLine + word + " ";
+                if (
+                  customFont.widthOfTextAtSize(testLine, fontSize) > textWidth
+                ) {
+                  // Draw the current line
+                  page.drawText(currentLine, {
+                    x: margin,
+                    y,
+                    size: fontSize,
+                    font: customFont,
+                    color: rgb(0, 0, 0),
+                  });
+
+                  // Start a new line
+                  y -= lineHeight;
+                  currentLine = word + " ";
+                } else {
+                  currentLine = testLine;
+                }
+              });
+
+              // Draw the last line
+              if (currentLine) {
+                page.drawText(currentLine, {
+                  x: margin,
+                  y,
+                  size: fontSize,
+                  font: customFont,
+                  color: rgb(0, 0, 0),
+                });
+                y -= lineHeight;
+              }
+            } else {
+              // If the line doesn't overflow, just draw it
+              if (y < margin + fontSize) {
+                y = height - margin;
+                pdfDoc.addPage();
+              }
+
+              page.drawText(line, {
+                x: margin,
+                y,
+                size: fontSize,
+                font: customFont,
+                color: rgb(0, 0, 0),
+              });
+
+              y -= lineHeight;
+            }
+
+            // Check for page break if there isn't enough space
             if (y < margin + fontSize) {
               y = height - margin;
               pdfDoc.addPage();
             }
-            page.drawText(line, {
-              x: margin,
-              y,
-              size: fontSize,
-              font,
-              color: rgb(0, 0, 0),
-            });
-            y -= fontSize + 4;
           });
         });
 
@@ -353,6 +418,7 @@ const App = () => {
 
       generatePDF();
     }
+
     if (fileType === "docx") {
       const doc = new Document({
         sections: [
@@ -421,7 +487,7 @@ const App = () => {
 
     const systemPrompt =
       aiForm.systemPrompt ||
-      `Translate the following text to ${targetLanguageName}, preserving formatting and tags:\n`;
+      `Translate the following text to ${targetLanguageName}. **Preserve ALL line breaks, punctuation, hyphens, and tags exactly as they are. Do not alter, merge, or change the structure of paragraphs, sentences, or special formatting. Keep the same layout and spacing:**`;
 
     const requestBody = isOpenAI
       ? {
@@ -463,12 +529,21 @@ const App = () => {
         ? responseData.choices?.[0]?.message?.content || ""
         : responseData.content?.[0]?.text || "";
 
-      const translatedLines = translatedText.split("\n");
+      const isSingleBlockFormat = ["pdf", "docx", "txt"].includes(fileType);
+
+      const translatedLines = isSingleBlockFormat
+        ? [translatedText]
+        : translatedText.split("\n");
 
       const updatedTranslations = translations.map((entry, index) => {
-        const selectedIndex = entriesToTranslate.findIndex(
-          (e) => e.key === entry.key
-        );
+        let selectedIndex;
+
+        if (selectedKeys.length > 0) {
+          selectedIndex = selectedKeys.indexOf(index);
+        } else {
+          selectedIndex = index;
+        }
+
         if (selectedIndex !== -1) {
           return {
             ...entry,
@@ -511,6 +586,13 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-sky-50 to-fuchsia-50 flex flex-col items-center">
+      {loading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="text-white text-xl">
+            Translating... Please wait...
+          </div>
+        </div>
+      )}
       <header
         className={`fixed top-0 left-0 right-0 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white py-2 text-center text-1xl font-semibold shadow-md z-50 transition-transform duration-300 ${
           showHeader ? "translate-y-0" : "-translate-y-full"

@@ -14,7 +14,8 @@ const TranslationTable = ({
   const shouldShowKey = !["pdf", "docx", "txt"].includes(
     fileType?.toLowerCase()
   );
-
+  const [rowHeights, setRowHeights] = useState([]);
+  const originalRefs = useRef([]);
   const [filteredTranslations, setFilteredTranslations] =
     useState(translations);
   const [filterKey, setFilterKey] = useState("");
@@ -27,7 +28,6 @@ const TranslationTable = ({
   });
   const [isAddingNewRow, setIsAddingNewRow] = useState(false);
 
-  const textareasRef = useRef([]);
   const [loading, setLoading] = useState(true);
 
   const toggleRow = (index) => {
@@ -62,15 +62,6 @@ const TranslationTable = ({
   };
 
   useEffect(() => {
-    textareasRef.current.forEach((textarea) => {
-      if (textarea) {
-        textarea.style.height = "auto";
-        textarea.style.height = `${textarea.scrollHeight}px`;
-      }
-    });
-  }, []);
-
-  useEffect(() => {
     setLoading(true);
     setTimeout(() => {
       setFilteredTranslations(
@@ -98,6 +89,13 @@ const TranslationTable = ({
     setTranslations(translations);
     setFilteredTranslations(translations);
   }, [translations]);
+
+  useEffect(() => {
+    const heights = originalRefs.current.map((ref) =>
+      ref ? ref.clientHeight : 40
+    );
+    setRowHeights(heights);
+  }, [filteredTranslations]);
 
   if (loading) {
     return (
@@ -185,7 +183,10 @@ const TranslationTable = ({
                       </div>
                     </td>
                   )}
-                  <td className="border px-4 py-2 whitespace-pre-wrap">
+                  <td
+                    ref={(el) => (originalRefs.current[index] = el)}
+                    className="border px-4 py-2 whitespace-pre-wrap"
+                  >
                     {typeof item.original === "string"
                       ? item.original
                       : React.isValidElement(item.original)
@@ -196,6 +197,7 @@ const TranslationTable = ({
                   <td className="border px-4 py-2 w-[700px]">
                     {item.original.length < 50 ? (
                       <input
+                        dir="auto"
                         type="text"
                         defaultValue={item.translation}
                         onChange={(e) => handleChange(index, e)}
@@ -207,7 +209,7 @@ const TranslationTable = ({
                       />
                     ) : (
                       <textarea
-                        ref={(el) => (textareasRef.current[index] = el)}
+                        dir="auto"
                         value={item.translation}
                         onChange={(e) => handleChange(index, e)}
                         className={`w-full p-2 border rounded resize-none overflow-hidden transition-all duration-200 ${
@@ -217,8 +219,9 @@ const TranslationTable = ({
                         }`}
                         style={{
                           minHeight: "40px",
-                          height:
-                            textareasRef.current[index]?.scrollHeight + "px",
+                          height: rowHeights[index]
+                            ? `${rowHeights[index]}px`
+                            : "auto",
                         }}
                       />
                     )}
