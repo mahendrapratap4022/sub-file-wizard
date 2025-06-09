@@ -10,6 +10,7 @@ const TranslationTable = ({
   fileType,
   modifiedFields,
   setModifiedFields,
+  wordCount,
 }) => {
   const shouldShowKey = !["pdf", "docx", "txt"].includes(
     fileType?.toLowerCase()
@@ -314,15 +315,18 @@ const TranslationTable = ({
           </table>
 
           {/* Save Button */}
-          <div
-            className={`fixed left-0 bottom-0 w-full bg-white shadow-md px-10 py-2 flex gap-4 z-40`}
-          >
-            <button
-              onClick={handleSave}
-              className="mx-auto block bg-gradient-to-r from-emerald-400 to-emerald-500 text-white py-3 px-6 text-lg font-semibold rounded-lg shadow-md hover:bg-green-600 transition-all"
-            >
-              Save / Export
-            </button>
+          <div className="fixed left-0 bottom-0 w-full bg-white shadow-md px-10 py-2 z-40">
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-gray-600">Word count: {wordCount}</p>
+              <button
+                onClick={handleSave}
+                className="bg-gradient-to-r from-emerald-400 to-emerald-500 text-white py-3 px-6 text-lg font-semibold rounded-lg shadow-md hover:bg-green-600 transition-all"
+              >
+                Save / Export
+              </button>
+              {/* invisible placeholder to balance spacing */}
+              <div className="w-[100px]" />
+            </div>
           </div>
         </div>
       </div>

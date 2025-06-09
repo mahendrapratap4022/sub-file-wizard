@@ -48,6 +48,13 @@ const App = () => {
     }, 5000);
   };
 
+  const countWordsInOriginalFile = (translation) => {
+    return translation.reduce((count, item) => {
+      const words = item.original.trim().split(/\s+/); // splits on any whitespace
+      return count + (item.original ? words.length : 0);
+    }, 0);
+  };
+
   const handleLanguageChange = (name) => {
     const selectedLang = lang.find((l) => l.name === name);
     setTargetLanguageName(name);
@@ -112,7 +119,6 @@ const App = () => {
     try {
       setTranslations([]);
       let parsedData = [];
-
       if (originalFileName) setOriginalFileName(originalFileName);
       if (targetFileName) setTargetFileName(targetFileName);
 
@@ -664,6 +670,7 @@ const App = () => {
         fileType={fileType}
         modifiedFields={modifiedFields}
         setModifiedFields={setModifiedFields}
+        wordCount={countWordsInOriginalFile(translations)}
       />
       {showAIModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-50">
